@@ -177,25 +177,33 @@ corretamente). A lógica das policies não mudou ao portar para Neon.
 O ambiente onde a Tarefa 02 foi implementada tem uma política de rede de
 saída restrita a uma allowlist que não inclui o host da Neon Auth/Data
 API deste projeto — chamadas HTTP de ponta a ponta contra o Neon real não
-podiam ser feitas de lá. Por isso, `scripts/test-tenant-isolation.sh`
-repete os mesmos 9 cenários via `curl` puro contra a Neon Auth e a Data
-API reais, pensado para rodar de uma máquina com rede normal:
+podiam ser feitas de lá. Dois scripts repetem os mesmos 9 cenários via
+HTTP real (Neon Auth + Data API), pensados para rodar fora dessa
+restrição:
 
-```bash
-chmod +x scripts/test-tenant-isolation.sh
-./scripts/test-tenant-isolation.sh
+- `scripts/test-tenant-isolation.sh` — via `curl`, para quem tem
+  terminal/Git Bash.
+- `scripts/test-tenant-isolation.browser.js` — a mesma coisa em
+  `fetch()`, para colar no Console do navegador (F12) em
+  `https://klikflow.vercel.app`, sem precisar instalar nada. Esse domínio
+  foi adicionado aos trusted origins do Neon Auth para isso funcionar.
+
+Cada cenário imprime `OK` ou `FAIL` e o script termina com o total.
+
+**Status: executado com sucesso contra o Neon real.** Rodado via o
+script de navegador em `https://klikflow.vercel.app`, com dois usuários
+reais criados pelo Neon Auth e JWTs reais (não simulados) contra a Data
+API:
+
+```
+Result: 9 passed, 0 failed
 ```
 
-Ele cria dois usuários de teste (emails com timestamp, nunca colidem),
-cria um tenant para cada um via `create_tenant()`, e tenta os mesmos
-ataques cross-tenant de antes — agora através da Data API com JWTs reais,
-não mais via SQL cru. Cada cenário imprime `OK` ou `FAIL` e o script
-termina com o total.
-
-**Status:** script escrito e com sintaxe validada (`bash -n`), mas ainda
-não executado contra o Neon real — pendente de rodar a partir de um
-ambiente sem a restrição de rede acima. Assim que rodar com sucesso (9/9
-`OK`), a Tarefa 02 pode ser considerada fechada de ponta a ponta.
+Os 9 cenários (leitura/escrita cross-tenant, alteração indevida,
+insert direto bloqueado, acesso anônimo bloqueado) se confirmaram
+idênticos ao que já tinha sido validado localmente durante o desenho do
+schema. **A Tarefa 02 está fechada de ponta a ponta**, incluindo a
+validação comportamental que ficara pendente.
 
 ## Credenciais geradas nesta tarefa
 

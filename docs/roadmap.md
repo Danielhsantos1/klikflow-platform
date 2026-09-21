@@ -43,22 +43,23 @@ do Supabase). O resultado final está no Neon.
   mesma lógica de policies foi aplicada ao Neon sem alteração.
 - `src/types/database.ts` e `src/types/tenant.ts` atualizados para
   espelhar o schema real.
-- **Pendente**: repetir os 9 cenários via HTTP contra o Neon real — a
-  política de rede deste ambiente de desenvolvimento bloqueia o host da
-  Neon Auth/Data API (fora do escopo resolver isso aqui).
+- **Fechado**: os 9 cenários foram repetidos via HTTP real (Neon Auth +
+  Data API) rodando `scripts/test-tenant-isolation.browser.js` no
+  Console do navegador em `https://klikflow.vercel.app` —
+  `9 passed, 0 failed`. Tarefa 02 validada de ponta a ponta.
+- App também já está publicado em produção: `https://klikflow.vercel.app`
+  (projeto Vercel `klikflow`, deploy automático a cada push no branch).
 
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Validar o isolamento entre tenants via HTTP contra o Neon real (de um
-   ambiente sem a restrição de rede deste sandbox).
-2. Tarefa 03 — sistema configurável de usuários/perfis/permissões,
+1. Tarefa 03 — sistema configurável de usuários/perfis/permissões,
    substituindo o enum fixo `memberships.role`.
-3. Tarefa 04 — catálogo (categorias, produtos, preços), estações de
+2. Tarefa 04 — catálogo (categorias, produtos, preços), estações de
    produção, locais de consumo.
-4. Tarefa 05 — Comanda + Pedidos (núcleo transacional).
-5. Tarefa 06 — Produção, status configurável, Realtime.
-6. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT.
-7. SaaS Admin (administração da plataforma, cross-tenant).
+3. Tarefa 05 — Comanda + Pedidos (núcleo transacional).
+4. Tarefa 06 — Produção, status configurável, Realtime.
+5. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT.
+6. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
 mesmo cuidado de não antecipar funcionalidades fora do escopo pedido.
