@@ -45,6 +45,13 @@ for f in db/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
 
 Ou via o MCP do Neon (`run_sql_transaction`), como foi feito nesta tarefa.
 
+**Importante:** depois de criar/alterar tabelas, atualizar o cache de
+schema da Neon Data API (painel do Neon → Postgres database → Data API →
+"Refresh schema cache", ou `update_data_api` via MCP/API). Sem isso, a
+Data API responde com *"Could not find the table ... in the schema
+cache"* mesmo com a tabela existindo e a RLS correta — já aconteceu na
+Tarefa 04 e parece um bug de permissão quando não é.
+
 Depois de aplicar, regenerar os tipos (quando o gerador oficial estiver
 acessível — ver `docs/data-api/generate-types` na documentação do Neon):
 

@@ -263,14 +263,31 @@ Tenant B usando uma categoria do Tenant A → bloqueado por
 `check_product_category_same_tenant()` com *"category must belong to
 the same tenant as the product"*, e a transação inteira desfeita. ✅
 
-### Comportamental via HTTP real — Tarefa 04 (pendente de confirmação)
+### Comportamental via HTTP real — Tarefa 04
 
 `scripts/test-catalog.browser.js` repete os cenários acima via HTTP real
 (Data API + JWTs), no mesmo padrão dos scripts anteriores — inclui um
 usuário sem membership no tenant tentando ler/escrever no catálogo (deve
 ser bloqueado) e a tentativa de anexar uma categoria de outro tenant a um
-produto. Rodar do mesmo jeito: `https://klikflow.vercel.app`, F12 →
-Console, colar o conteúdo do arquivo.
+produto.
+
+**Achado operacional importante:** a primeira execução deu `3 passed, 4
+failed`, com erro `"Could not find the table 'public.products' in the
+schema cache"`. Não era bug de RLS nem do código — a **Neon Data API
+cacheia o schema do banco**, e como a migration foi aplicada via SQL
+direto (MCP), não pelo Console do Neon, o cache não foi atualizado
+automaticamente. Resolvido chamando o refresh do cache (`update_data_api`
+via MCP, equivalente ao botão "Refresh schema cache" no painel). Depois
+disso, nova execução: `7 passed, 0 failed`.
+
+**Regra para as próximas tarefas:** sempre que uma migration criar/alterar
+tabelas expostas pela Data API, atualizar o cache do schema logo em
+seguida (painel do Neon → Data API → "Refresh schema cache", ou o
+equivalente via MCP/API) antes de testar via HTTP — senão os erros de
+"tabela não encontrada" parecem um bug de RLS/policy quando na verdade
+são só cache desatualizado.
+
+**A Tarefa 04 está fechada de ponta a ponta.**
 
 ### Comportamental — Tarefa 03 (simulado via SQL, `klikflow_owner`)
 

@@ -97,23 +97,23 @@ do Supabase). O resultado final está no Neon.
 - `src/types/database.ts` (novas tabelas) e `src/types/catalog.ts`
   (novo, tipos de domínio) criados; `ConsumptionLocation` migrado do
   placeholder em `tenant.ts` para o tipo real.
-- `scripts/test-catalog.browser.js` criado para validar via HTTP real —
-  inclui teste de usuário sem membership tentando ler/escrever no
-  catálogo, e tentativa de anexar categoria de outro tenant.
-- **Pendente**: rodar esse script no navegador e confirmar o resultado.
+- **Fechado**: `scripts/test-catalog.browser.js` rodado contra o Neon
+  real — `7 passed, 0 failed` (após atualizar o cache de schema da Data
+  API, ver "achado operacional" em `docs/database.md`). Confirmado:
+  usuário sem membership não lê nem escreve no catálogo de outro tenant;
+  categoria de outro tenant não pode ser anexada a um produto.
 - Nenhuma UI de catálogo (cardápio, cadastro de produto) criada — fora
   do escopo desta tarefa.
 
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar a validação via HTTP da Tarefa 04 contra o Neon real.
-2. Tarefa 05 — Comanda + Pedidos (núcleo transacional). Itens de pedido
+1. Tarefa 05 — Comanda + Pedidos (núcleo transacional). Itens de pedido
    devem gravar snapshot do preço/nome do produto no momento da compra,
    nunca reconsultar `products` depois.
-3. Tarefa 06 — Produção, status configurável, Realtime.
-4. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
+2. Tarefa 06 — Produção, status configurável, Realtime.
+3. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
    — inclui a primeira UI real de catálogo e de gestão de usuários/perfis.
-5. SaaS Admin (administração da plataforma, cross-tenant).
+4. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
 mesmo cuidado de não antecipar funcionalidades fora do escopo pedido.
