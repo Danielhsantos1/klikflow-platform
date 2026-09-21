@@ -174,17 +174,28 @@ da migração para Neon, contra um Postgres 16 local simulando o
 auto-promoção de role, bypass de RPC, acesso anônimo — todos bloqueados
 corretamente). A lógica das policies não mudou ao portar para Neon.
 
-O que **não** foi possível repetir contra o Neon real nesta sessão: um
-teste HTTP de ponta a ponta pela Data API com um JWT de verdade. O
-ambiente de desenvolvimento tem uma política de rede de saída restrita a
-uma allowlist, e o host da Neon Auth/Data API deste projeto
-(`*.neonauth.sa-east-1.aws.neon.tech`) não está nela — uma chamada real
-do app rodando localmente (`npm run dev`) confirmou que o proxy chega a
-tentar a conexão e é bloqueado com *"Host not in allowlist"*, não um erro
-de código. Em produção (Vercel) ou em qualquer ambiente sem essa
-restrição, o fluxo funciona normalmente. Repetir os 9 cenários de
-isolamento via HTTP contra o Neon real é a validação pendente mais
-importante antes de considerar a Tarefa 02 100% fechada.
+O ambiente onde a Tarefa 02 foi implementada tem uma política de rede de
+saída restrita a uma allowlist que não inclui o host da Neon Auth/Data
+API deste projeto — chamadas HTTP de ponta a ponta contra o Neon real não
+podiam ser feitas de lá. Por isso, `scripts/test-tenant-isolation.sh`
+repete os mesmos 9 cenários via `curl` puro contra a Neon Auth e a Data
+API reais, pensado para rodar de uma máquina com rede normal:
+
+```bash
+chmod +x scripts/test-tenant-isolation.sh
+./scripts/test-tenant-isolation.sh
+```
+
+Ele cria dois usuários de teste (emails com timestamp, nunca colidem),
+cria um tenant para cada um via `create_tenant()`, e tenta os mesmos
+ataques cross-tenant de antes — agora através da Data API com JWTs reais,
+não mais via SQL cru. Cada cenário imprime `OK` ou `FAIL` e o script
+termina com o total.
+
+**Status:** script escrito e com sintaxe validada (`bash -n`), mas ainda
+não executado contra o Neon real — pendente de rodar a partir de um
+ambiente sem a restrição de rede acima. Assim que rodar com sucesso (9/9
+`OK`), a Tarefa 02 pode ser considerada fechada de ponta a ponta.
 
 ## Credenciais geradas nesta tarefa
 
