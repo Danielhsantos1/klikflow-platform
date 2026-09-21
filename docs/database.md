@@ -1,9 +1,10 @@
-# Banco de dados — Tarefas 02 e 03
+# Banco de dados — Tarefas 02, 03 e 04
 
-Schema de multi-tenancy, autenticação, RLS (Tarefa 02) e do sistema
-configurável de perfis/permissões (Tarefa 03). Vive em
-`db/migrations/*.sql`, versionado e aplicado via SQL direto (não há CLI
-de migrations dedicado no fluxo atual — ver "Como aplicar" abaixo).
+Schema de multi-tenancy, autenticação, RLS (Tarefa 02), sistema
+configurável de perfis/permissões (Tarefa 03) e catálogo/produção/locais
+de consumo (Tarefa 04). Vive em `db/migrations/*.sql`, versionado e
+aplicado via SQL direto (não há CLI de migrations dedicado no fluxo
+atual — ver "Como aplicar" abaixo).
 
 ## Provedor: Neon (não Supabase)
 
@@ -35,7 +36,7 @@ relacionado.
 
 ## Como aplicar as migrations
 
-As 6 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
+As 7 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
 `production`) via MCP do Neon (`run_sql_transaction`), na ordem dos
 arquivos. Para reaplicar em outro branch/projeto:
 
@@ -58,6 +59,7 @@ existe um estado intermediário exposto.
 | `0004_core_multitenancy.sql` | `tenants`, `units`, `memberships`, funções `is_tenant_member`/`is_tenant_admin` (esta última substituída na 0006), função `create_tenant()`, e todas as políticas RLS dessas três tabelas. |
 | `0005_audit_log.sql` | Tabela `audit_log` append-only, somente leitura para admins do tenant. |
 | `0006_permissions_roles.sql` | Tarefa 03: `permissions` (catálogo fixo), `roles` (Perfis configuráveis por tenant), `role_permissions`, função `has_permission()` (substitui `is_tenant_admin`), triggers de proteção (`protect_system_role`, `protect_last_owner_membership`), `memberships.role` (enum fixo) trocado por `memberships.role_id` (FK para `roles`), `create_tenant()` atualizado para criar o Perfil "Proprietário". |
+| `0007_catalog.sql` | Tarefa 04: `categories`, `products` (com `price`/`image_url`), `production_stations` (Estação de Produção), `product_stations` (associação produto↔estação), `consumption_locations` (Local de Consumo, sob `units`). 3 novas permissões (`catalog.manage`, `production_stations.manage`, `consumption_locations.manage`) e o trigger `check_product_category_same_tenant`. |
 
 ## Entidades
 
@@ -77,7 +79,9 @@ existe um estado intermediário exposto.
   também comportar futuras entradas de nível de plataforma (SaaS Admin).
 - **`permissions`** *(Tarefa 03)* — catálogo global e fixo de ações
   possíveis (`tenant.manage`, `units.manage`, `memberships.manage`,
-  `roles.manage`, `audit_log.read`). Só muda via migration, nunca pelo
+  `roles.manage`, `audit_log.read`, e desde a Tarefa 04 também
+  `catalog.manage`, `production_stations.manage`,
+  `consumption_locations.manage`). Só muda via migration, nunca pelo
   tenant.
 - **`roles`** *(Tarefa 03)* — os Perfis, configuráveis por Empresa (não
   fixos como "admin"/"garçom"). Cada tenant cria os seus próprios. O
@@ -85,6 +89,20 @@ existe um estado intermediário exposto.
   `create_tenant()` e nunca pode ser renomeado ou excluído.
 - **`role_permissions`** *(Tarefa 03)* — liga um Perfil às Permissões que
   ele concede.
+- **`categories`** *(Tarefa 04)* — categorias de produto, por tenant.
+- **`products`** *(Tarefa 04)* — `price` (`numeric(10,2)`, sempre ≥ 0),
+  `image_url` (texto — nenhuma integração de upload nesta etapa),
+  `category_id` opcional. Guarda o preço **atual**; um pedido (Tarefa 05)
+  deve gravar o preço no momento da compra no próprio item, nunca
+  reconsultar `products` depois (ver princípio de histórico em
+  `docs/security.md`).
+- **`production_stations`** *(Tarefa 04)* — Estação de Produção
+  (ex: Chapa, Forno, Confeitaria, Expedição), por tenant.
+- **`product_stations`** *(Tarefa 04)* — associação produto ↔ estação(s),
+  com `sequence` para o produto passar por várias estações em ordem.
+- **`consumption_locations`** *(Tarefa 04)* — Local de Consumo (Mesa 01,
+  Balcão 02, Quarto 103...). Pertence a uma `unit`, não diretamente ao
+  tenant — reflete a hierarquia Tenant → Unit → Local de Consumo.
 
 ### De `memberships.role` (Tarefa 02) para `memberships.role_id` (Tarefa 03)
 
@@ -196,6 +214,14 @@ futura consegue contornar isso, mesmo sem checagem própria.
 | `permissions` | qualquer autenticado | — (só migration) | — | — |
 | `roles` | membro | `roles.manage`\* | `roles.manage`\*\* | `roles.manage`\*\* |
 | `role_permissions` | membro (via `roles.tenant_id`) | `roles.manage` (via `roles.tenant_id`) | — | `roles.manage` (via `roles.tenant_id`) |
+| `categories` | membro | `catalog.manage` | `catalog.manage` | `catalog.manage` |
+| `products` | membro | `catalog.manage`\*\*\* | `catalog.manage`\*\*\* | `catalog.manage` |
+| `production_stations` | membro | `production_stations.manage` | `production_stations.manage` | `production_stations.manage` |
+| `product_stations` | membro (via `products.tenant_id`) | `catalog.manage` (via `products.tenant_id`) | `catalog.manage` (via `products.tenant_id`) | `catalog.manage` (via `products.tenant_id`) |
+| `consumption_locations` | membro (via `units.tenant_id`) | `consumption_locations.manage` (via `units.tenant_id`) | `consumption_locations.manage` (via `units.tenant_id`) | `consumption_locations.manage` (via `units.tenant_id`) |
+
+\*\*\* também sujeito a `check_product_category_same_tenant()` — a
+`category_id` de um produto precisa pertencer ao mesmo tenant do produto.
 
 \* também sujeito a `protect_last_owner_membership()` — nunca deixa o
 último dono ser removido/rebaixado, mesmo por quem tem `memberships.manage`.
@@ -210,18 +236,41 @@ checagem de RLS.
 
 ### Estrutural (feita contra o projeto Neon real)
 
-Confirmado via `pg_class`/`pg_policies` depois de aplicar as 6
+Confirmado via `pg_class`/`pg_policies` depois de aplicar as 7
 migrations no projeto `klikflow`:
 
-- `relrowsecurity` e `relforcerowsecurity` = `true` nas 8 tabelas
+- `relrowsecurity` e `relforcerowsecurity` = `true` nas 13 tabelas
   (`profiles`, `tenants`, `units`, `memberships`, `audit_log`,
-  `permissions`, `roles`, `role_permissions`).
+  `permissions`, `roles`, `role_permissions`, `categories`, `products`,
+  `production_stations`, `product_stations`, `consumption_locations`).
 - Roles `authenticated` e `anonymous` da Data API confirmadas com
   `rolbypassrls = false` (RLS realmente se aplica a elas) — diferente da
   role `klikflow_owner`/`klikflow_app`, que tem `BYPASSRLS = true` e não
   pode ser alterada via SQL (limitação da plataforma Neon).
 - `auth.uid()` confirmada como função real (`pg_session_jwt`), retornando
   `uuid`.
+
+### Comportamental — Tarefa 04 (simulado via SQL, `klikflow_owner`)
+
+Fluxo completo criado numa transação real contra o projeto Neon
+(sem rollback desta vez, dados removidos depois): Unidade → Categoria →
+Produto (com preço) → Estação de Produção → associação produto↔estação
+(com `sequence`) → Local de Consumo sob a Unidade. Tudo criado
+corretamente, com os relacionamentos certos. ✅
+
+Testei também a proteção cross-tenant: tentar criar um produto no
+Tenant B usando uma categoria do Tenant A → bloqueado por
+`check_product_category_same_tenant()` com *"category must belong to
+the same tenant as the product"*, e a transação inteira desfeita. ✅
+
+### Comportamental via HTTP real — Tarefa 04 (pendente de confirmação)
+
+`scripts/test-catalog.browser.js` repete os cenários acima via HTTP real
+(Data API + JWTs), no mesmo padrão dos scripts anteriores — inclui um
+usuário sem membership no tenant tentando ler/escrever no catálogo (deve
+ser bloqueado) e a tentativa de anexar uma categoria de outro tenant a um
+produto. Rodar do mesmo jeito: `https://klikflow.vercel.app`, F12 →
+Console, colar o conteúdo do arquivo.
 
 ### Comportamental — Tarefa 03 (simulado via SQL, `klikflow_owner`)
 

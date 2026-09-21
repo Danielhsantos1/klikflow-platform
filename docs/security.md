@@ -63,6 +63,10 @@
   marcar permissões) — o backend (Tarefa 03) está pronto e testado via
   Data API (`10 passed, 0 failed`, ver `docs/database.md`), mas nenhuma
   UI foi criada.
+- Tela de catálogo/cardápio (Tarefa 04) — schema pronto e testado via
+  SQL contra o Neon real; confirmação via HTTP
+  (`scripts/test-catalog.browser.js`) pendente de execução; nenhuma UI
+  criada.
 
 ## Checklist para as próximas etapas
 

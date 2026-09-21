@@ -37,7 +37,12 @@ export type PermissionKey =
   | "units.manage"
   | "memberships.manage"
   | "roles.manage"
-  | "audit_log.read";
+  | "audit_log.read"
+  | "catalog.manage"
+  | "production_stations.manage"
+  | "consumption_locations.manage";
+
+export type CatalogStatus = "active" | "archived";
 
 export interface Database {
   public: {
@@ -227,6 +232,177 @@ export interface Database {
             columns: ["permission_key"];
             referencedRelation: "permissions";
             referencedColumns: ["key"];
+          },
+        ];
+      };
+      categories: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          status: CatalogStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          status?: CatalogStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          status?: CatalogStatus;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "categories_tenant_id_fkey";
+            columns: ["tenant_id"];
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      products: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          category_id: string | null;
+          name: string;
+          description: string | null;
+          price: string;
+          image_url: string | null;
+          status: CatalogStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          category_id?: string | null;
+          name: string;
+          description?: string | null;
+          price: number | string;
+          image_url?: string | null;
+          status?: CatalogStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          category_id?: string | null;
+          name?: string;
+          description?: string | null;
+          price?: number | string;
+          image_url?: string | null;
+          status?: CatalogStatus;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "products_tenant_id_fkey";
+            columns: ["tenant_id"];
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "products_category_id_fkey";
+            columns: ["category_id"];
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      production_stations: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          status: CatalogStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          status?: CatalogStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          status?: CatalogStatus;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "production_stations_tenant_id_fkey";
+            columns: ["tenant_id"];
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      product_stations: {
+        Row: {
+          product_id: string;
+          station_id: string;
+          sequence: number;
+        };
+        Insert: {
+          product_id: string;
+          station_id: string;
+          sequence?: number;
+        };
+        Update: {
+          sequence?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_stations_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_stations_station_id_fkey";
+            columns: ["station_id"];
+            referencedRelation: "production_stations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      consumption_locations: {
+        Row: {
+          id: string;
+          unit_id: string;
+          label: string;
+          status: CatalogStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          unit_id: string;
+          label: string;
+          status?: CatalogStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          label?: string;
+          status?: CatalogStatus;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "consumption_locations_unit_id_fkey";
+            columns: ["unit_id"];
+            referencedRelation: "units";
+            referencedColumns: ["id"];
           },
         ];
       };

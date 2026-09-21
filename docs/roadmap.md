@@ -78,15 +78,41 @@ do Supabase). O resultado final está no Neon.
 - Nenhuma UI de gestão de perfis/usuários criada — fora do escopo (só a
   base configurável de autorização).
 
+## Concluído (Tarefa 04 — Catálogo + Produção + Locais)
+
+- `db/migrations/0007_catalog.sql` aplicada ao projeto Neon real:
+  `categories`, `products` (`price`, `image_url`), `production_stations`
+  (Estação de Produção), `product_stations` (associação com `sequence`),
+  `consumption_locations` (Local de Consumo, sob `units`).
+- 3 novas permissões (`catalog.manage`, `production_stations.manage`,
+  `consumption_locations.manage`) — `create_tenant()` não precisou
+  mudar, já concede automaticamente todas as permissões do catálogo ao
+  Perfil "Proprietário".
+- Trigger `check_product_category_same_tenant()`: um produto não pode
+  usar uma categoria de outro tenant — testado de verdade contra o Neon
+  (bloqueado com sucesso, transação desfeita).
+- Fluxo completo testado via SQL contra o Neon real: Unidade → Categoria
+  → Produto (com preço) → Estação de Produção → associação → Local de
+  Consumo.
+- `src/types/database.ts` (novas tabelas) e `src/types/catalog.ts`
+  (novo, tipos de domínio) criados; `ConsumptionLocation` migrado do
+  placeholder em `tenant.ts` para o tipo real.
+- `scripts/test-catalog.browser.js` criado para validar via HTTP real —
+  inclui teste de usuário sem membership tentando ler/escrever no
+  catálogo, e tentativa de anexar categoria de outro tenant.
+- **Pendente**: rodar esse script no navegador e confirmar o resultado.
+- Nenhuma UI de catálogo (cardápio, cadastro de produto) criada — fora
+  do escopo desta tarefa.
+
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Tarefa 04 — catálogo (categorias, produtos, preços), estações de
-   produção, locais de consumo — cada novo recurso ganha suas próprias
-   `permissions` no catálogo.
-2. Tarefa 05 — Comanda + Pedidos (núcleo transacional).
+1. Confirmar a validação via HTTP da Tarefa 04 contra o Neon real.
+2. Tarefa 05 — Comanda + Pedidos (núcleo transacional). Itens de pedido
+   devem gravar snapshot do preço/nome do produto no momento da compra,
+   nunca reconsultar `products` depois.
 3. Tarefa 06 — Produção, status configurável, Realtime.
 4. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
-   — inclui a primeira UI real de gestão de usuários/perfis.
+   — inclui a primeira UI real de catálogo e de gestão de usuários/perfis.
 5. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
