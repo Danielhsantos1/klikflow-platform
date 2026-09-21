@@ -29,9 +29,20 @@
   Neon; ver `docs/database.md` para o detalhe e para a validação
   comportamental ainda pendente contra o Neon real.
 - **`tenant_id` nunca é confiado vindo do cliente**: toda política usa
-  `is_tenant_member()`/`is_tenant_admin()`, que resolvem a associação
-  usuário↔tenant a partir de `auth.uid()` no banco, não de um valor
-  enviado na query.
+  `is_tenant_member()`/`has_permission()`, que resolvem a associação
+  usuário↔tenant e a permissão concedida a partir de `auth.uid()` no
+  banco, não de um valor enviado na query.
+- **Permissões configuráveis, não um enum fixo (Tarefa 03)**:
+  `memberships.role_id` aponta para um Perfil (`roles`) próprio de cada
+  tenant, com permissões granulares em `role_permissions`. Nenhum código
+  do app decide autorização — tudo é resolvido por `has_permission()` no
+  banco.
+- **Uma Empresa nunca fica sem dono**: dois triggers em nível de banco
+  garantem isso mesmo que uma rota futura esqueça de checar —
+  `protect_system_role()` bloqueia renomear/excluir o Perfil de dono, e
+  `protect_last_owner_membership()` bloqueia remover ou rebaixar a última
+  membership ativa desse Perfil. Testado contra o projeto Neon real (ver
+  `docs/database.md`).
 - **Criação de tenant via RPC, não INSERT direto**: não existe política
   de INSERT em `tenants`; só a função `create_tenant()` (`SECURITY
   DEFINER`) pode criar um tenant, garantindo que ele nasça sempre com um
@@ -48,13 +59,14 @@
   está pronta: o proxy obrigatório (`src/app/api/auth/[...path]/route.ts`),
   o helper de leitura de sessão (`src/lib/auth/session.ts`) e o trigger
   `handle_new_user()` (cria `profiles` no signup).
-- Sistema de permissões/roles configurável — `memberships.role` hoje é um
-  enum fixo (`owner`/`manager`/`staff`), suficiente para a RLS desta
-  etapa. O sistema configurável de perfis/permissões é escopo da Tarefa
-  03.
-- Validação comportamental via HTTP contra o Neon real (bloqueada pela
-  política de rede deste ambiente de desenvolvimento — ver
-  `docs/database.md`).
+- Tela de gestão de Perfis/permissões (convidar usuário, criar Perfil,
+  marcar permissões) — o backend (Tarefa 03) está pronto e testável via
+  Data API, mas nenhuma UI foi criada.
+- Confirmação final da validação comportamental via HTTP dos cenários da
+  Tarefa 03 contra o Neon real (`scripts/test-permissions.browser.js`
+  escrito e com sintaxe validada; execução depende do usuário rodar no
+  navegador, já que este ambiente de desenvolvimento não alcança o host
+  da Neon Auth/Data API — ver `docs/database.md`).
 
 ## Checklist para as próximas etapas
 

@@ -1,6 +1,7 @@
-# Banco de dados — Tarefa 02
+# Banco de dados — Tarefas 02 e 03
 
-Schema inicial de multi-tenancy, autenticação e RLS. Vive em
+Schema de multi-tenancy, autenticação, RLS (Tarefa 02) e do sistema
+configurável de perfis/permissões (Tarefa 03). Vive em
 `db/migrations/*.sql`, versionado e aplicado via SQL direto (não há CLI
 de migrations dedicado no fluxo atual — ver "Como aplicar" abaixo).
 
@@ -34,7 +35,7 @@ relacionado.
 
 ## Como aplicar as migrations
 
-As 5 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
+As 6 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
 `production`) via MCP do Neon (`run_sql_transaction`), na ordem dos
 arquivos. Para reaplicar em outro branch/projeto:
 
@@ -54,8 +55,9 @@ existe um estado intermediário exposto.
 | `0001_extensions.sql` | Vazio intencionalmente (placeholder para extensões futuras); `gen_random_uuid()` já é nativo do Postgres 13+. |
 | `0002_utility_functions.sql` | `set_updated_at()` — trigger genérico reaproveitado por todas as tabelas. |
 | `0003_profiles.sql` | Tabela `profiles` (espelho 1:1 de `neon_auth."user"`), trigger `handle_new_user()` que cria o profile no signup, RLS restrita ao próprio usuário. |
-| `0004_core_multitenancy.sql` | `tenants`, `units`, `memberships`, funções `is_tenant_member`/`is_tenant_admin`, função `create_tenant()`, e todas as políticas RLS dessas três tabelas. |
+| `0004_core_multitenancy.sql` | `tenants`, `units`, `memberships`, funções `is_tenant_member`/`is_tenant_admin` (esta última substituída na 0006), função `create_tenant()`, e todas as políticas RLS dessas três tabelas. |
 | `0005_audit_log.sql` | Tabela `audit_log` append-only, somente leitura para admins do tenant. |
+| `0006_permissions_roles.sql` | Tarefa 03: `permissions` (catálogo fixo), `roles` (Perfis configuráveis por tenant), `role_permissions`, função `has_permission()` (substitui `is_tenant_admin`), triggers de proteção (`protect_system_role`, `protect_last_owner_membership`), `memberships.role` (enum fixo) trocado por `memberships.role_id` (FK para `roles`), `create_tenant()` atualizado para criar o Perfil "Proprietário". |
 
 ## Entidades
 
@@ -68,19 +70,33 @@ existe um estado intermediário exposto.
   soft-lifecycle em vez de exclusão física).
 - **`units`** — a Unidade, pertence a um `tenant_id`.
 - **`memberships`** — a peça central do isolamento: liga
-  `user_id ↔ tenant_id (↔ unit_id opcional)` com um `role`
-  (`owner`/`manager`/`staff`). Toda política RLS deste schema depende
-  desta tabela, nunca de um `tenant_id` enviado pelo cliente.
+  `user_id ↔ tenant_id (↔ unit_id opcional)` com um `role_id` (Perfil).
+  Toda política RLS deste schema depende desta tabela, nunca de um
+  `tenant_id` enviado pelo cliente.
 - **`audit_log`** — trilha de auditoria. `tenant_id` é opcional para
   também comportar futuras entradas de nível de plataforma (SaaS Admin).
+- **`permissions`** *(Tarefa 03)* — catálogo global e fixo de ações
+  possíveis (`tenant.manage`, `units.manage`, `memberships.manage`,
+  `roles.manage`, `audit_log.read`). Só muda via migration, nunca pelo
+  tenant.
+- **`roles`** *(Tarefa 03)* — os Perfis, configuráveis por Empresa (não
+  fixos como "admin"/"garçom"). Cada tenant cria os seus próprios. O
+  Perfil "Proprietário" (`is_system = true`) nasce automaticamente com
+  `create_tenant()` e nunca pode ser renomeado ou excluído.
+- **`role_permissions`** *(Tarefa 03)* — liga um Perfil às Permissões que
+  ele concede.
 
-### Sobre `role` em `memberships`
+### De `memberships.role` (Tarefa 02) para `memberships.role_id` (Tarefa 03)
 
-`role` é um `check` fixo (`owner`, `manager`, `staff`) — o mínimo que a
-RLS desta tarefa precisa. A Tarefa 03 (Usuários + Perfis + Permissões)
-deverá introduzir o sistema configurável de perfis/permissões descrito na
-direção mestre do projeto; este campo é o que existe até lá, não a
-solução final.
+Na Tarefa 02, `role` era um `check` fixo (`owner`/`manager`/`staff`) — o
+mínimo que a RLS precisava até existir um sistema de verdade. A Tarefa 03
+substitui isso pelo sistema descrito na direção mestre do projeto
+("Usuário → Perfil → Permissões → Função"): `memberships.role` virou
+`memberships.role_id`, apontando para um Perfil configurável em `roles`,
+com granularidade fina via `role_permissions`. Nenhuma tabela de negócio
+futura (produtos, pedidos, pagamentos) deve voltar a usar um enum de
+"papel" fixo — deve ganhar sua própria permissão em `permissions` e ser
+checada com `has_permission()`.
 
 ## Multi-tenancy
 
@@ -91,8 +107,9 @@ cliente. Toda política de SELECT/INSERT/UPDATE/DELETE usa
 nunca a partir de um valor enviado na query.
 
 ```sql
-is_tenant_member(target_tenant_id) → existe membership ativa de auth.uid() nesse tenant?
-is_tenant_admin(target_tenant_id)  → idem, com role in ('owner', 'manager')
+is_tenant_member(target_tenant_id)          → existe membership ativa de auth.uid() nesse tenant?
+has_permission(target_tenant_id, perm_key)  → o Perfil da membership ativa de auth.uid() nesse
+                                                tenant concede essa permissão? (substitui is_tenant_admin)
 ```
 
 `auth.uid()`, no Neon, é fornecida pela extensão `pg_session_jwt` — a
@@ -122,6 +139,39 @@ o comportamento do Postgres aqui é idêntico):
    INSERT` não é enxergada a tempo por essa verificação. Colocar os dois
    inserts dentro de uma função `SECURITY DEFINER` elimina o problema.
 
+## Sistema de permissões (Tarefa 03)
+
+```
+Usuário → Membership → Perfil (role) → Permissões (permission_key)
+```
+
+- Cada tenant tem seus próprios Perfis (`roles`), nunca um catálogo fixo
+  de cargos globais.
+- `create_tenant()` sempre cria o Perfil "Proprietário" (`is_system =
+  true`) com **todas** as permissões do catálogo, e a membership do
+  criador aponta pra esse Perfil.
+- Quem tem a permissão `roles.manage` pode criar outros Perfis (ex:
+  "Gerente", "Caixa") e escolher quais permissões cada um concede, via
+  INSERT/UPDATE/DELETE normais em `roles`/`role_permissions` pela Data
+  API — não precisou de nenhuma função RPC extra, porque diferente da
+  criação de tenant, quem cria um Perfil novo já é membro do tenant (a
+  policy de SELECT em `roles` já enxerga a linha recém-criada via
+  `INSERT ... RETURNING` sem o problema de timing descrito acima).
+
+### Duas proteções contra a Empresa ficar sem dono
+
+1. **`protect_system_role()`** (trigger em `roles`) — bloqueia
+   `UPDATE`/`DELETE` que renomeie ou apague um Perfil `is_system`.
+2. **`protect_last_owner_membership()`** (trigger em `memberships`) —
+   antes de excluir uma membership, ou trocar seu `role_id`/`status`,
+   verifica se ela é a última membership ativa com o Perfil de dono do
+   tenant; se for, bloqueia com uma exceção. Vale tanto para o próprio
+   dono tentando sair/se rebaixar quanto para outro admin tentando
+   removê-lo.
+
+Essas duas proteções rodam no banco, não no app — nenhuma tela ou rota
+futura consegue contornar isso, mesmo sem checagem própria.
+
 ## Auth
 
 - `neon_auth."user"` (gerenciado pelo Neon Auth) dispara
@@ -139,10 +189,18 @@ o comportamento do Postgres aqui é idêntico):
 | Tabela | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
 | `profiles` | dono (`id = auth.uid()`) | — (só via trigger) | dono | — |
-| `tenants` | membro | — (só via `create_tenant()`) | admin do tenant | — (arquivar via `status`) |
-| `units` | membro | admin do tenant | admin do tenant | admin do tenant |
-| `memberships` | membro | admin do tenant | admin do tenant | admin do tenant |
-| `audit_log` | admin do tenant | — (só via `src/lib/db/admin.ts`, fora da Data API) | — | — |
+| `tenants` | membro | — (só via `create_tenant()`) | `tenant.manage` | — (arquivar via `status`) |
+| `units` | membro | `units.manage` | `units.manage` | `units.manage` |
+| `memberships` | membro | `memberships.manage`\* | `memberships.manage`\* | `memberships.manage`\* |
+| `audit_log` | `audit_log.read` | — (só via `src/lib/db/admin.ts`, fora da Data API) | — | — |
+| `permissions` | qualquer autenticado | — (só migration) | — | — |
+| `roles` | membro | `roles.manage`\* | `roles.manage`\*\* | `roles.manage`\*\* |
+| `role_permissions` | membro (via `roles.tenant_id`) | `roles.manage` (via `roles.tenant_id`) | — | `roles.manage` (via `roles.tenant_id`) |
+
+\* também sujeito a `protect_last_owner_membership()` — nunca deixa o
+último dono ser removido/rebaixado, mesmo por quem tem `memberships.manage`.
+\*\* também sujeito a `protect_system_role()` — o Perfil `is_system` nunca
+pode ser renomeado nem excluído, mesmo por quem tem `roles.manage`.
 
 O role `anonymous` (usuário não autenticado da Data API) não recebe
 nenhum `GRANT` nessas tabelas — o acesso falha antes de sequer chegar à
@@ -152,19 +210,45 @@ checagem de RLS.
 
 ### Estrutural (feita contra o projeto Neon real)
 
-Confirmado via `pg_class`/`pg_policies` depois de aplicar as 5
+Confirmado via `pg_class`/`pg_policies` depois de aplicar as 6
 migrations no projeto `klikflow`:
 
-- `relrowsecurity` e `relforcerowsecurity` = `true` nas 5 tabelas.
-- 13 policies no total, distribuídas exatamente como na tabela acima
-  (`profiles`: 2, `tenants`: 2, `units`: 4, `memberships`: 4,
-  `audit_log`: 1).
+- `relrowsecurity` e `relforcerowsecurity` = `true` nas 8 tabelas
+  (`profiles`, `tenants`, `units`, `memberships`, `audit_log`,
+  `permissions`, `roles`, `role_permissions`).
 - Roles `authenticated` e `anonymous` da Data API confirmadas com
   `rolbypassrls = false` (RLS realmente se aplica a elas) — diferente da
   role `klikflow_owner`/`klikflow_app`, que tem `BYPASSRLS = true` e não
   pode ser alterada via SQL (limitação da plataforma Neon).
 - `auth.uid()` confirmada como função real (`pg_session_jwt`), retornando
   `uuid`.
+
+### Comportamental — Tarefa 03 (simulado via SQL, `klikflow_owner`)
+
+Antes de aplicar em produção, os triggers de proteção foram exercitados
+de verdade contra o projeto Neon real, dentro de transações (cada
+tentativa inválida aborta a transação inteira — nada fica persistido):
+
+1. `create_tenant()` simulado manualmente (mesmos INSERTs, com
+   `ROLLBACK` no final): tenant + Perfil "Proprietário" (`is_system =
+   true`) + as 5 permissões do catálogo + membership com esse
+   `role_id` — tudo criado corretamente. ✅
+2. Tentativa de `UPDATE roles SET name = 'Hackeado' ... WHERE is_system`
+   → bloqueada por `protect_system_role()`. ✅
+3. Tentativa de `DELETE` no Perfil `is_system` → bloqueada. ✅
+4. Tentativa de `DELETE` na única membership ativa de um tenant (o dono)
+   → bloqueada por `protect_last_owner_membership()` com *"cannot remove
+   the last owner of a tenant"*. ✅
+
+### Comportamental via HTTP real (pendente de confirmação)
+
+`scripts/test-permissions.browser.js` repete os cenários acima, mas via
+HTTP de verdade (Data API + JWTs reais), no mesmo padrão dos scripts de
+isolamento da Tarefa 02 — dois usuários reais, um Perfil customizado
+("Caixa") criado com uma única permissão, e as tentativas de
+auto-rebaixamento/auto-remoção do último dono. Rodar da mesma forma:
+abrir `https://klikflow.vercel.app`, F12 → Console, colar o conteúdo do
+arquivo e conferir `Result: 9 passed, 0 failed`.
 
 ### Comportamental (isolamento entre tenants)
 

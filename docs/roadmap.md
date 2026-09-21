@@ -50,15 +50,43 @@ do Supabase). O resultado final está no Neon.
 - App também já está publicado em produção: `https://klikflow.vercel.app`
   (projeto Vercel `klikflow`, deploy automático a cada push no branch).
 
+## Concluído (Tarefa 03 — Usuários + Perfis + Permissões)
+
+- `db/migrations/0006_permissions_roles.sql` aplicada ao projeto Neon
+  real: `permissions` (catálogo fixo com 5 permissões iniciais), `roles`
+  (Perfis configuráveis por tenant), `role_permissions`.
+- `memberships.role` (enum fixo da Tarefa 02) substituído por
+  `memberships.role_id`, apontando para um Perfil configurável.
+- `has_permission(tenant_id, perm_key)` substitui `is_tenant_admin()` em
+  todas as policies (`tenants`, `units`, `memberships`, `audit_log`).
+- `create_tenant()` atualizado: cria o Perfil "Proprietário"
+  (`is_system = true`) com todas as permissões e a membership do criador
+  aponta pra esse Perfil.
+- Duas proteções em nível de banco: `protect_system_role()` (Perfil de
+  dono não pode ser renomeado/excluído) e
+  `protect_last_owner_membership()` (Empresa nunca fica sem dono) —
+  ambas testadas de verdade contra o Neon real (transações com rollback
+  confirmando o bloqueio).
+- `src/types/database.ts`, `src/types/tenant.ts` e
+  `src/lib/permissions/types.ts` atualizados para o schema real.
+- `scripts/test-permissions.browser.js` criado para validar via HTTP
+  (Data API + JWTs reais) os cenários de permissão granular e das duas
+  proteções — mesmo padrão dos scripts da Tarefa 02.
+- **Pendente**: rodar esse script no navegador (mesma restrição de rede
+  da Tarefa 02) e confirmar `9 passed, 0 failed`.
+- Nenhuma UI de gestão de perfis/usuários criada — fora do escopo (só a
+  base configurável de autorização).
+
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Tarefa 03 — sistema configurável de usuários/perfis/permissões,
-   substituindo o enum fixo `memberships.role`.
+1. Confirmar a validação via HTTP da Tarefa 03 contra o Neon real.
 2. Tarefa 04 — catálogo (categorias, produtos, preços), estações de
-   produção, locais de consumo.
+   produção, locais de consumo — cada novo recurso ganha suas próprias
+   `permissions` no catálogo.
 3. Tarefa 05 — Comanda + Pedidos (núcleo transacional).
 4. Tarefa 06 — Produção, status configurável, Realtime.
-5. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT.
+5. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
+   — inclui a primeira UI real de gestão de usuários/perfis.
 6. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o

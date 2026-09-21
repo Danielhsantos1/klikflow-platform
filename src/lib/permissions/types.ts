@@ -1,17 +1,19 @@
+import type { Database } from "@/types/database";
+
 /**
- * Vocabulary for the future role/permission system. No enforcement lives
- * here yet — this only names the shape so features can be written against
- * a stable contract before the real rules and RLS policies exist.
+ * Real types from the configurable permission system (Task 03) — see
+ * `db/migrations/0006_permissions_roles.sql`. `Role` here means "Perfil"
+ * (avoids colliding with `public.profiles`, the user data table).
  */
-export type Role = "saas_admin" | "owner" | "manager" | "staff";
+export type Permission = Database["public"]["Tables"]["permissions"]["Row"];
+export type PermissionKey = Permission["key"];
+export type Role = Database["public"]["Tables"]["roles"]["Row"];
+export type RolePermission =
+  Database["public"]["Tables"]["role_permissions"]["Row"];
 
-export interface Permission {
-  resource: string;
-  action: "create" | "read" | "update" | "delete";
-}
-
-export interface Profile {
-  userId: string;
-  tenantId: string;
-  role: Role;
-}
+/**
+ * `saas_admin` is a platform-level concept (SaaS Admin experience, out
+ * of scope until that task) — it is not a tenant `Role` and has no table
+ * yet. Kept here only to reserve the vocabulary.
+ */
+export type PlatformRole = "saas_admin";

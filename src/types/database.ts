@@ -24,8 +24,20 @@ export type TenantSegment =
 
 export type TenantStatus = "active" | "suspended" | "archived";
 export type UnitStatus = "active" | "archived";
-export type MembershipRole = "owner" | "manager" | "staff";
 export type MembershipStatus = "active" | "invited" | "suspended";
+
+/**
+ * Fixed catalog seeded in `db/migrations/0006_permissions_roles.sql`.
+ * New keys are added by future migrations as new business resources
+ * (products, orders, payments...) get their own permissions — this union
+ * should be kept in sync with the `permissions` table.
+ */
+export type PermissionKey =
+  | "tenant.manage"
+  | "units.manage"
+  | "memberships.manage"
+  | "roles.manage"
+  | "audit_log.read";
 
 export interface Database {
   public: {
@@ -108,7 +120,7 @@ export interface Database {
           tenant_id: string;
           user_id: string;
           unit_id: string | null;
-          role: MembershipRole;
+          role_id: string;
           status: MembershipStatus;
           created_at: string;
           updated_at: string;
@@ -118,14 +130,14 @@ export interface Database {
           tenant_id: string;
           user_id: string;
           unit_id?: string | null;
-          role?: MembershipRole;
+          role_id: string;
           status?: MembershipStatus;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           unit_id?: string | null;
-          role?: MembershipRole;
+          role_id?: string;
           status?: MembershipStatus;
           updated_at?: string;
         };
@@ -141,6 +153,80 @@ export interface Database {
             columns: ["unit_id"];
             referencedRelation: "units";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "memberships_role_id_fkey";
+            columns: ["role_id"];
+            referencedRelation: "roles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      permissions: {
+        Row: {
+          key: PermissionKey;
+          description: string;
+        };
+        // No Insert/Update/Delete: the catalog only changes via
+        // migration, never through client code.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      roles: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          is_system: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          // No is_system here: the only is_system role is the one
+          // create_tenant() creates server-side; client code can only
+          // ever create ordinary (is_system = false) roles.
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "roles_tenant_id_fkey";
+            columns: ["tenant_id"];
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      role_permissions: {
+        Row: {
+          role_id: string;
+          permission_key: PermissionKey;
+        };
+        Insert: {
+          role_id: string;
+          permission_key: PermissionKey;
+        };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_role_id_fkey";
+            columns: ["role_id"];
+            referencedRelation: "roles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "role_permissions_permission_key_fkey";
+            columns: ["permission_key"];
+            referencedRelation: "permissions";
+            referencedColumns: ["key"];
           },
         ];
       };
@@ -181,8 +267,8 @@ export interface Database {
         Args: { target_tenant_id: string };
         Returns: boolean;
       };
-      is_tenant_admin: {
-        Args: { target_tenant_id: string };
+      has_permission: {
+        Args: { target_tenant_id: string; perm_key: PermissionKey };
         Returns: boolean;
       };
     };
