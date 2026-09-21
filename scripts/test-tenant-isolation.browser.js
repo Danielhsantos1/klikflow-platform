@@ -56,7 +56,7 @@
     method: "POST",
     body: JSON.stringify({ tenant_name: "Cafeteria da Ana (teste)", tenant_segment: "cafeteria" }),
   });
-  const tenantAId = tA.body?.id;
+  const tenantAId = Array.isArray(tA.body) ? tA.body[0]?.id : tA.body?.id;
   tenantAId ? ok(`Tenant A created (${tenantAId})`) : bad(`Tenant A creation failed: ${JSON.stringify(tA)}`);
 
   console.log("\n=== 2. User A creates a unit in Tenant A ===");
@@ -75,7 +75,7 @@
     method: "POST",
     body: JSON.stringify({ tenant_name: "Restaurante do Beto (teste)", tenant_segment: "restaurant" }),
   });
-  const tenantBId = tB.body?.id;
+  const tenantBId = Array.isArray(tB.body) ? tB.body[0]?.id : tB.body?.id;
   tenantBId ? ok(`Tenant B created (${tenantBId})`) : bad(`Tenant B creation failed: ${JSON.stringify(tB)}`);
 
   console.log("\n=== 4. User B should see only Tenant B (expect count=1) ===");
