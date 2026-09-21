@@ -240,15 +240,32 @@ tentativa inválida aborta a transação inteira — nada fica persistido):
    → bloqueada por `protect_last_owner_membership()` com *"cannot remove
    the last owner of a tenant"*. ✅
 
-### Comportamental via HTTP real (pendente de confirmação)
+### Comportamental via HTTP real
 
 `scripts/test-permissions.browser.js` repete os cenários acima, mas via
 HTTP de verdade (Data API + JWTs reais), no mesmo padrão dos scripts de
 isolamento da Tarefa 02 — dois usuários reais, um Perfil customizado
 ("Caixa") criado com uma única permissão, e as tentativas de
-auto-rebaixamento/auto-remoção do último dono. Rodar da mesma forma:
-abrir `https://klikflow.vercel.app`, F12 → Console, colar o conteúdo do
-arquivo e conferir `Result: 9 passed, 0 failed`.
+auto-rebaixamento/auto-remoção do último dono.
+
+**Status: executado com sucesso contra o Neon real.**
+
+```
+Result: 10 passed, 0 failed
+```
+
+Confirmado via o Console do navegador em `https://klikflow.vercel.app`:
+Perfil "Proprietário" nasce com as 5 permissões; um Perfil "Caixa"
+customizado com só `audit_log.read` conseguiu ler a auditoria mas foi
+bloqueado ao tentar renomear o tenant e criar uma unidade; o dono não
+conseguiu se auto-rebaixar nem se auto-remover (última proteção). Os
+dados de teste (2 tenants, 4 usuários) foram removidos do banco depois —
+tivemos que desabilitar temporariamente os próprios triggers de proteção
+para a limpeza, o que por si só confirmou que eles bloqueiam até
+exclusões em cascata (`DELETE` de usuário → cascade em `memberships` →
+trigger ainda impedindo remover o último dono).
+
+**A Tarefa 03 está fechada de ponta a ponta.**
 
 ### Comportamental (isolamento entre tenants)
 

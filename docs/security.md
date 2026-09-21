@@ -60,13 +60,9 @@
   o helper de leitura de sessão (`src/lib/auth/session.ts`) e o trigger
   `handle_new_user()` (cria `profiles` no signup).
 - Tela de gestão de Perfis/permissões (convidar usuário, criar Perfil,
-  marcar permissões) — o backend (Tarefa 03) está pronto e testável via
-  Data API, mas nenhuma UI foi criada.
-- Confirmação final da validação comportamental via HTTP dos cenários da
-  Tarefa 03 contra o Neon real (`scripts/test-permissions.browser.js`
-  escrito e com sintaxe validada; execução depende do usuário rodar no
-  navegador, já que este ambiente de desenvolvimento não alcança o host
-  da Neon Auth/Data API — ver `docs/database.md`).
+  marcar permissões) — o backend (Tarefa 03) está pronto e testado via
+  Data API (`10 passed, 0 failed`, ver `docs/database.md`), mas nenhuma
+  UI foi criada.
 
 ## Checklist para as próximas etapas
 

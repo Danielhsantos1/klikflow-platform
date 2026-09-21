@@ -69,25 +69,25 @@ do Supabase). O resultado final está no Neon.
   confirmando o bloqueio).
 - `src/types/database.ts`, `src/types/tenant.ts` e
   `src/lib/permissions/types.ts` atualizados para o schema real.
-- `scripts/test-permissions.browser.js` criado para validar via HTTP
-  (Data API + JWTs reais) os cenários de permissão granular e das duas
-  proteções — mesmo padrão dos scripts da Tarefa 02.
-- **Pendente**: rodar esse script no navegador (mesma restrição de rede
-  da Tarefa 02) e confirmar `9 passed, 0 failed`.
+- **Fechado**: `scripts/test-permissions.browser.js` rodado contra o
+  Neon real (`https://klikflow.vercel.app`, Console do navegador) —
+  `10 passed, 0 failed`. Confirmado: Perfil "Proprietário" nasce com
+  todas as permissões; um Perfil customizado ("Caixa") com só
+  `audit_log.read` só conseguiu o que tinha permissão; dono não
+  conseguiu se auto-rebaixar nem se auto-remover.
 - Nenhuma UI de gestão de perfis/usuários criada — fora do escopo (só a
   base configurável de autorização).
 
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar a validação via HTTP da Tarefa 03 contra o Neon real.
-2. Tarefa 04 — catálogo (categorias, produtos, preços), estações de
+1. Tarefa 04 — catálogo (categorias, produtos, preços), estações de
    produção, locais de consumo — cada novo recurso ganha suas próprias
    `permissions` no catálogo.
-3. Tarefa 05 — Comanda + Pedidos (núcleo transacional).
-4. Tarefa 06 — Produção, status configurável, Realtime.
-5. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
+2. Tarefa 05 — Comanda + Pedidos (núcleo transacional).
+3. Tarefa 06 — Produção, status configurável, Realtime.
+4. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
    — inclui a primeira UI real de gestão de usuários/perfis.
-6. SaaS Admin (administração da plataforma, cross-tenant).
+5. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
 mesmo cuidado de não antecipar funcionalidades fora do escopo pedido.
