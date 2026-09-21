@@ -40,7 +40,7 @@ create index units_tenant_id_idx on public.units (tenant_id);
 create table public.memberships (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants (id) on delete cascade,
-  user_id uuid not null references auth.users (id) on delete cascade,
+  user_id uuid not null references neon_auth."user" (id) on delete cascade,
   unit_id uuid references public.units (id) on delete set null,
   role text not null default 'staff'
     check (role in ('owner', 'manager', 'staff')),
@@ -76,7 +76,9 @@ create trigger set_memberships_updated_at
 -- `security definer` is required so these can be called from an RLS
 -- policy on `memberships` itself without recursing back into RLS: the
 -- function body runs with the privileges of its owner (bypassing RLS),
--- while `auth.uid()` still reflects the calling user's own session.
+-- while `auth.uid()` still reflects the calling user's own session (Neon
+-- Auth JWT `sub` claim, verified by the `pg_session_jwt` extension that
+-- backs the Neon Data API).
 -- ---------------------------------------------------------------------
 
 create or replace function public.is_tenant_member(target_tenant_id uuid)
@@ -123,16 +125,15 @@ grant execute on function public.is_tenant_admin(uuid) to authenticated;
 --   1. Creating the tenant row and its owner membership must be atomic;
 --      a bare INSERT + an AFTER trigger would leave a moment where the
 --      tenant exists without an owner if anything in between failed.
---   2. `INSERT ... RETURNING` (what `supabase-js`'s `.insert().select()`
+--   2. `INSERT ... RETURNING` (what the Data API's `.insert().select()`
 --      generates) re-checks the SELECT policy against the freshly
 --      inserted row in the same statement. Since `tenants_select_member`
 --      depends on a membership row, and that membership would only be
 --      created by an AFTER INSERT trigger *on the same statement*, the
 --      RETURNING check does not reliably see it yet and the insert is
---      rejected. Doing both writes inside one SECURITY DEFINER function
---      sidesteps that entirely: the function itself bypasses RLS, and it
---      returns the already-known row directly instead of forcing a
---      policy-checked RETURNING.
+--      rejected (confirmed against a real Postgres instance while this
+--      schema was still being validated for Supabase). Doing both writes
+--      inside one SECURITY DEFINER function sidesteps that entirely.
 create or replace function public.create_tenant(tenant_name text, tenant_segment text default 'other')
 returns public.tenants
 language plpgsql
@@ -173,8 +174,9 @@ alter table public.memberships force row level security;
 
 -- Table-level grants only decide *whether* a role may attempt the
 -- operation at all; the policies below still decide *which rows*.
--- `anon` intentionally gets nothing here — every one of these tables
--- requires an authenticated, tenant-scoped session.
+-- `anonymous` (the Data API's unauthenticated role) intentionally gets
+-- nothing here — every one of these tables requires an authenticated,
+-- tenant-scoped session.
 -- No INSERT grant on tenants: creation only happens through
 -- `create_tenant()` above, which runs as SECURITY DEFINER.
 grant select, update on public.tenants to authenticated;

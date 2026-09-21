@@ -1,26 +1,51 @@
 # Banco de dados — Tarefa 02
 
 Schema inicial de multi-tenancy, autenticação e RLS. Vive em
-`supabase/migrations/*.sql`, versionado e aplicado via Supabase CLI —
-nunca editado manualmente em produção.
+`db/migrations/*.sql`, versionado e aplicado via SQL direto (não há CLI
+de migrations dedicado no fluxo atual — ver "Como aplicar" abaixo).
 
-## Por que ainda não está aplicado a um projeto Supabase
+## Provedor: Neon (não Supabase)
 
-O plano gratuito da organização já usa os 2 projetos ativos permitidos
-(`igreja360`, `unha-marcada`); criar ou reativar um terceiro exigiria
-pausar um deles, o que não foi autorizado nesta etapa. As migrations
-abaixo estão prontas para aplicar assim que houver um projeto disponível
-(`supabase link` + `supabase db push`, ou colando o SQL no SQL Editor do
-Supabase Studio).
+Esta tarefa começou desenhada para Supabase e foi re-executada em cima do
+**Neon** a pedido do usuário: o plano gratuito da organização já usava os
+2 projetos Supabase permitidos, e criar/pausar um deles não foi
+autorizado. A arquitetura de multi-tenancy e RLS é a mesma nos dois
+provedores — só a peça de infraestrutura por baixo mudou.
 
-## Como foram validadas sem um projeto Supabase
+Projeto usado: **`klikflow`** (id `hidden-cake-81994840`, região
+`aws-sa-east-1`, branch `production`), criado do zero e dedicado só ao
+KlikFlow. Um projeto Neon pré-existente do usuário ("Teste doc") foi
+inspecionado primeiro e descartado por já conter o schema de outra
+aplicação (DocDeck: `companies`, `contracts`, `tenants`, `users`, etc.) —
+aplicar ali teria colidido com nomes de tabela de um projeto não
+relacionado.
 
-Sem projeto remoto e sem Docker disponível neste ambiente (`supabase
-start` não roda), o schema foi validado contra um Postgres 16 local, com
-um schema `auth` mínimo simulando `auth.users` e `auth.uid()` (lendo o
-claim `request.jwt.claim.sub`, como o PostgREST do Supabase faz de
-verdade). Isso permitiu testar as políticas de RLS com usuários reais,
-não só ler o SQL. Ver seção "Testes de segurança executados".
+## Peças do Neon usadas
+
+- **Postgres** (a database em si, `klikflow` na branch `production`).
+- **Neon Auth** (Managed Better Auth): autenticação hospedada. Usuários
+  vivem em `neon_auth."user"` (não em `auth.users` como no Supabase).
+- **Neon Data API**: interface REST estilo PostgREST sobre a database,
+  autenticada por JWT do Neon Auth. É o que faz `auth.uid()` existir
+  dentro do Postgres (via a extensão `pg_session_jwt`) e é o único jeito
+  de ter RLS realmente aplicada — conexões diretas com a role
+  `klikflow_owner` têm `BYPASSRLS = true` e a Neon não permite removê-lo
+  de roles criadas via API.
+
+## Como aplicar as migrations
+
+As 5 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
+`production`) via MCP do Neon (`run_sql_transaction`), na ordem dos
+arquivos. Para reaplicar em outro branch/projeto:
+
+```bash
+# usando psql, na ordem dos arquivos
+for f in db/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
+```
+
+Cada migration mistura DDL (tabelas, índices) com DML de segurança
+(RLS, policies, grants) no mesmo arquivo — a tabela nasce protegida, nunca
+existe um estado intermediário exposto.
 
 ## Migrations
 
@@ -28,7 +53,7 @@ não só ler o SQL. Ver seção "Testes de segurança executados".
 |---|---|
 | `0001_extensions.sql` | Vazio intencionalmente (placeholder para extensões futuras); `gen_random_uuid()` já é nativo do Postgres 13+. |
 | `0002_utility_functions.sql` | `set_updated_at()` — trigger genérico reaproveitado por todas as tabelas. |
-| `0003_profiles.sql` | Tabela `profiles` (espelho 1:1 de `auth.users`), trigger `handle_new_user()` que cria o profile no signup, RLS restrita ao próprio usuário. |
+| `0003_profiles.sql` | Tabela `profiles` (espelho 1:1 de `neon_auth."user"`), trigger `handle_new_user()` que cria o profile no signup, RLS restrita ao próprio usuário. |
 | `0004_core_multitenancy.sql` | `tenants`, `units`, `memberships`, funções `is_tenant_member`/`is_tenant_admin`, função `create_tenant()`, e todas as políticas RLS dessas três tabelas. |
 | `0005_audit_log.sql` | Tabela `audit_log` append-only, somente leitura para admins do tenant. |
 
@@ -36,6 +61,7 @@ não só ler o SQL. Ver seção "Testes de segurança executados".
 
 - **`profiles`** — dados do usuário (nome). Não carrega `tenant_id`: um
   usuário pode pertencer a mais de um tenant através de `memberships`.
+  FK para `neon_auth."user"(id)`.
 - **`tenants`** — a Empresa. Campos: `name`, `segment` (apenas
   descritivo — nada no schema ou no app pode ramificar comportamento por
   segmento), `status` (`active`/`suspended`/`archived`, para
@@ -69,10 +95,11 @@ is_tenant_member(target_tenant_id) → existe membership ativa de auth.uid() nes
 is_tenant_admin(target_tenant_id)  → idem, com role in ('owner', 'manager')
 ```
 
-Ambas são `SECURITY DEFINER` para poderem ser chamadas de dentro da
-própria política de `memberships` sem recursão: a função roda com o
-privilégio do owner (bypassa RLS), enquanto `auth.uid()` continua
-refletindo a sessão de quem chamou.
+`auth.uid()`, no Neon, é fornecida pela extensão `pg_session_jwt` — a
+mesma peça que a Neon Data API usa para verificar o JWT assinado pelo
+Neon Auth e popular a sessão Postgres. Retorna `uuid`, extraído do claim
+`sub` do JWT — comportamento idêntico ao `auth.uid()` do Supabase, o que
+tornou a portabilidade das policies quase 1:1.
 
 ## Criação de tenant: por que uma função RPC, não um INSERT direto
 
@@ -80,7 +107,8 @@ Não existe política de INSERT em `tenants`. A criação passa por
 `create_tenant(tenant_name, tenant_segment)`, uma função `SECURITY
 DEFINER` que insere o tenant e a membership de owner na mesma transação
 e retorna a linha diretamente. Dois motivos, descobertos durante os
-testes desta tarefa (não apenas teóricos):
+testes desta tarefa (contra Postgres puro, antes da migração para Neon —
+o comportamento do Postgres aqui é idêntico):
 
 1. **Atomicidade** — tenant e membership de owner nascem juntos; não deve
    existir um instante em que o tenant exista sem dono.
@@ -88,24 +116,23 @@ testes desta tarefa (não apenas teóricos):
    inicial (INSERT direto em `tenants` + trigger `AFTER INSERT` criando a
    membership) falhava com *"new row violates row-level security policy
    for table tenants"* sempre que a query pedia `RETURNING` — que é
-   exatamente o que `supabase-js` gera para `.insert(...).select()`. O
+   exatamente o que a Data API gera para `.insert(...).select()`. O
    Postgres verifica a política de SELECT sobre a linha retornada dentro
    do mesmo statement, e a membership criada por um trigger `AFTER
    INSERT` não é enxergada a tempo por essa verificação. Colocar os dois
-   inserts dentro de uma função `SECURITY DEFINER` elimina o problema:
-   ela bypassa RLS internamente e devolve a linha já conhecida, sem
-   depender de um `RETURNING` verificado por política.
+   inserts dentro de uma função `SECURITY DEFINER` elimina o problema.
 
 ## Auth
 
-- `auth.users` (gerenciado pelo Supabase Auth) dispara
+- `neon_auth."user"` (gerenciado pelo Neon Auth) dispara
   `handle_new_user()` via trigger `on_auth_user_created`, criando a linha
   correspondente em `public.profiles`.
 - Nenhuma tela de login/signup foi criada nesta tarefa — isso pertence às
   experiências de produto (Customer/Operations/Management), fora do
-  escopo da fundação de dados.
-- `src/lib/auth/session.ts` (Tarefa 01) já expõe `getCurrentUser()` para
-  ler a sessão no servidor; nada mudou nele.
+  escopo da fundação de dados. O que existe é só a infraestrutura:
+  `src/app/api/auth/[...path]/route.ts` (proxy obrigatório da API do Neon
+  Auth) e `src/lib/auth/server.ts` + `src/lib/auth/session.ts`
+  (`getCurrentUser()`).
 
 ## RLS — resumo por tabela
 
@@ -115,42 +142,59 @@ testes desta tarefa (não apenas teóricos):
 | `tenants` | membro | — (só via `create_tenant()`) | admin do tenant | — (arquivar via `status`) |
 | `units` | membro | admin do tenant | admin do tenant | admin do tenant |
 | `memberships` | membro | admin do tenant | admin do tenant | admin do tenant |
-| `audit_log` | admin do tenant | — (só service role) | — | — |
+| `audit_log` | admin do tenant | — (só via `src/lib/db/admin.ts`, fora da Data API) | — | — |
 
-`anon` não recebe nenhum `GRANT` nessas tabelas — o acesso falha antes de
-sequer chegar à checagem de RLS.
+O role `anonymous` (usuário não autenticado da Data API) não recebe
+nenhum `GRANT` nessas tabelas — o acesso falha antes de sequer chegar à
+checagem de RLS.
 
-## Testes de segurança executados
+## Validação
 
-Script local (não commitado — vive fora do repositório) simulando dois
-tenants e três usuários contra o Postgres local com o stub de `auth`:
+### Estrutural (feita contra o projeto Neon real)
 
-1. Usuário A cria o Tenant A via `create_tenant()` e vira `owner`
-   automaticamente. ✅
-2. Usuário B cria o Tenant B; só enxerga seu próprio tenant
-   (`count(*) = 1`). ✅
-3. Usuário B não enxerga as `units` do Tenant A (`count(*) = 0`). ✅
-4. Usuário B tenta `UPDATE` no Tenant A → `UPDATE 0` (nenhuma linha
-   afetada); nome do Tenant A permanece intacto. ✅
-5. Usuário B tenta `INSERT` uma `unit` diretamente no Tenant A →
-   bloqueado (`insufficient_privilege`, RLS). ✅
-6. `staff-a` (membro não-admin do Tenant A) tenta se auto-promover a
-   `owner` via `UPDATE memberships` → 0 linhas afetadas (bloqueado por
-   RLS, não por erro de permissão de coluna). ✅
-7. `staff-a` tenta criar uma `unit` (ação de admin) → bloqueado. ✅
-8. Um usuário autenticado tenta `INSERT` direto em `tenants` (contornando
-   `create_tenant()`) → bloqueado por falta de `GRANT`/política. ✅
-9. `anon` (sem sessão) tenta ler `tenants` e `memberships` → bloqueado
-   antes mesmo da RLS, por falta de `GRANT`. ✅
+Confirmado via `pg_class`/`pg_policies` depois de aplicar as 5
+migrations no projeto `klikflow`:
 
-Todos os 9 cenários passaram no ambiente de teste local.
+- `relrowsecurity` e `relforcerowsecurity` = `true` nas 5 tabelas.
+- 13 policies no total, distribuídas exatamente como na tabela acima
+  (`profiles`: 2, `tenants`: 2, `units`: 4, `memberships`: 4,
+  `audit_log`: 1).
+- Roles `authenticated` e `anonymous` da Data API confirmadas com
+  `rolbypassrls = false` (RLS realmente se aplica a elas) — diferente da
+  role `klikflow_owner`/`klikflow_app`, que tem `BYPASSRLS = true` e não
+  pode ser alterada via SQL (limitação da plataforma Neon).
+- `auth.uid()` confirmada como função real (`pg_session_jwt`), retornando
+  `uuid`.
 
-## Limitação conhecida
+### Comportamental (isolamento entre tenants)
 
-Os testes acima rodaram contra um Postgres genérico com um `auth` stub,
-não contra o Supabase gerenciado real. O comportamento de RLS testado
-(GRANT, `SECURITY DEFINER`, `auth.uid()` via `current_setting`) é
-exatamente o que o PostgREST do Supabase usa em produção, mas a validação
-final "de verdade" — aplicar em um projeto Supabase real e repetir os
-mesmos 9 cenários via `supabase-js` — ainda está pendente até haver um
-projeto disponível.
+O desenho de RLS foi testado ponta a ponta com usuários reais **antes**
+da migração para Neon, contra um Postgres 16 local simulando o
+`auth.uid()` do Supabase (9 cenários: leitura/escrita cross-tenant,
+auto-promoção de role, bypass de RPC, acesso anônimo — todos bloqueados
+corretamente). A lógica das policies não mudou ao portar para Neon.
+
+O que **não** foi possível repetir contra o Neon real nesta sessão: um
+teste HTTP de ponta a ponta pela Data API com um JWT de verdade. O
+ambiente de desenvolvimento tem uma política de rede de saída restrita a
+uma allowlist, e o host da Neon Auth/Data API deste projeto
+(`*.neonauth.sa-east-1.aws.neon.tech`) não está nela — uma chamada real
+do app rodando localmente (`npm run dev`) confirmou que o proxy chega a
+tentar a conexão e é bloqueado com *"Host not in allowlist"*, não um erro
+de código. Em produção (Vercel) ou em qualquer ambiente sem essa
+restrição, o fluxo funciona normalmente. Repetir os 9 cenários de
+isolamento via HTTP contra o Neon real é a validação pendente mais
+importante antes de considerar a Tarefa 02 100% fechada.
+
+## Credenciais geradas nesta tarefa
+
+- Role `klikflow_owner` (dono do projeto, criada automaticamente pelo
+  Neon) — usada para aplicar as migrations e para `src/lib/db/admin.ts`.
+- Role `klikflow_app` foi criada durante a investigação mas **não é
+  usada** — descoberta de que toda role criada via API do Neon vem com
+  `BYPASSRLS = true` sem forma de remover via SQL, então uma role de
+  aplicação "sem privilégio" não cumpre o papel que teria no Supabase.
+  Pode ser removida numa limpeza futura.
+- Nenhuma credencial real foi commitada. `.env.local` (fora do Git) tem
+  os valores reais deste projeto; `.env.example` documenta as chaves sem
+  valores.

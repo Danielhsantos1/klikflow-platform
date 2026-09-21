@@ -1,11 +1,9 @@
 /**
- * Hand-written to mirror `supabase/migrations/*.sql` exactly, because this
- * environment has no Docker available to run
- * `npx supabase gen types typescript --db-url ...`.
- *
- * Once the migrations are applied to a real Supabase project, regenerate
- * this file for real and discard the manual version:
- *   npx supabase gen types typescript --project-id <project-id> > src/types/database.ts
+ * Hand-written to mirror `db/migrations/*.sql` exactly (the `public`
+ * schema, which is what the Neon Data API exposes via `.from()`/`.rpc()`
+ * — `neon_auth.*` is Neon Auth's own schema and isn't queried directly by
+ * app code). See `docs/data-api/generate-types` for the official
+ * generator once this environment can reach Neon's tooling directly.
  */
 export type Json =
   | string
@@ -158,9 +156,9 @@ export interface Database {
           after_data: Json | null;
           created_at: string;
         };
-        // No Insert/Update types: writes only happen via the service
-        // role from trusted server code, never through the anon/
-        // authenticated Postgres roles this app's clients use.
+        // No Insert/Update types: writes only happen via the privileged
+        // direct connection (src/lib/db/admin.ts) from trusted server
+        // code, never through the Data API's authenticated role.
         Insert: never;
         Update: never;
         Relationships: [

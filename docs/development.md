@@ -9,7 +9,7 @@
 
 ```bash
 npm install
-cp .env.example .env.local   # preencher com as chaves reais do projeto Supabase
+cp .env.example .env.local   # preencher com as chaves reais do projeto Neon
 npm run dev
 ```
 
@@ -26,7 +26,7 @@ npm run dev
 
 - TypeScript em modo `strict` (já configurado em `tsconfig.json`).
 - Um domínio de negócio = um diretório em `src/features/<dominio>`.
-- Nunca importar `src/lib/supabase/admin.ts` de um componente client
+- Nunca importar `src/lib/db/admin.ts` de um componente client
   (`"use client"`) — o pacote `server-only` bloqueia isso em build.
 - Validar toda entrada externa (formulários, payloads de API) com Zod
   antes de usá-la.
@@ -36,18 +36,20 @@ npm run dev
 
 ## Migrations do banco
 
-Vivem em `supabase/migrations/*.sql`, numeradas e aplicadas em ordem.
-Nunca editar uma migration já aplicada — criar uma nova.
+Vivem em `db/migrations/*.sql`, numeradas e aplicadas em ordem. Nunca
+editar uma migration já aplicada — criar uma nova.
 
 ```bash
-npx supabase link --project-ref <project-ref>
-npx supabase db push       # aplica as migrations pendentes
+for f in db/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
 ```
 
-Depois de aplicar, regenerar os tipos:
+Ou via o MCP do Neon (`run_sql_transaction`), como foi feito nesta tarefa.
+
+Depois de aplicar, regenerar os tipos (quando o gerador oficial estiver
+acessível — ver `docs/data-api/generate-types` na documentação do Neon):
 
 ```bash
-npx supabase gen types typescript --project-id <project-ref> > src/types/database.ts
+# placeholder — o gerador exato depende de rede que este ambiente não tinha
 ```
 
 Ver `docs/database.md` para o schema, a estratégia de RLS e os testes de
@@ -56,5 +58,6 @@ isolamento já executados.
 ## Deploy
 
 Vercel, conectado ao branch principal do GitHub. Variáveis de ambiente do
-Supabase devem ser configuradas no dashboard do projeto Vercel, não
-commitadas.
+Neon (`NEXT_PUBLIC_NEON_DATABASE_URL`, `NEON_AUTH_BASE_URL`,
+`NEON_AUTH_COOKIE_SECRET`, `DATABASE_URL`) devem ser configuradas no
+dashboard do projeto Vercel, não commitadas.

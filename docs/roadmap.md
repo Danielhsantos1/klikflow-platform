@@ -17,27 +17,40 @@
 
 ## Concluído (Tarefa 02 — Banco + Multi-tenancy + Auth + RLS)
 
-- Schema versionado em `supabase/migrations/`: `profiles`, `tenants`,
-  `units`, `memberships`, `audit_log`.
+Executada duas vezes: primeiro desenhada para Supabase, depois portada
+para **Neon** a pedido do usuário (limite de projetos do plano gratuito
+do Supabase). O resultado final está no Neon.
+
+- Schema versionado em `db/migrations/`: `profiles`, `tenants`, `units`,
+  `memberships`, `audit_log` — **aplicado a um projeto Neon real**
+  (`klikflow`, região `sa-east-1`).
 - RLS habilitado e forçado em todas as tabelas, isolando tenants via
   `is_tenant_member()`/`is_tenant_admin()` — nunca via `tenant_id` do
-  cliente.
+  cliente. Confirmado estruturalmente contra o projeto real (RLS
+  enable+force, 13 policies, roles da Data API sem `BYPASSRLS`).
 - Criação de tenant via função RPC `create_tenant()` (atômica, evita o
   bug de RLS+`RETURNING` documentado em `docs/database.md`).
-- Trigger `handle_new_user()` sincronizando `auth.users` → `profiles`.
+- Trigger `handle_new_user()` sincronizando `neon_auth."user"` →
+  `profiles`.
 - `audit_log` somente leitura para admins do tenant; sem INSERT/UPDATE/
   DELETE client-side.
-- 9 cenários de isolamento/segurança testados contra Postgres local (ver
-  `docs/database.md`) — todos passaram.
+- Neon Auth (Managed Better Auth) + Neon Data API provisionados; proxy de
+  auth (`src/app/api/auth/[...path]/route.ts`), instância server
+  (`src/lib/auth/server.ts`) e clients de banco (`src/lib/db/client.ts`,
+  `src/lib/db/admin.ts`) implementados.
+- 9 cenários de isolamento/segurança testados ponta a ponta contra
+  Postgres local antes da portabilidade (ver `docs/database.md`) — a
+  mesma lógica de policies foi aplicada ao Neon sem alteração.
 - `src/types/database.ts` e `src/types/tenant.ts` atualizados para
   espelhar o schema real.
-- Migrations ainda não aplicadas a um projeto Supabase real (limite do
-  plano gratuito da organização — decisão pendente do usuário).
+- **Pendente**: repetir os 9 cenários via HTTP contra o Neon real — a
+  política de rede deste ambiente de desenvolvimento bloqueia o host da
+  Neon Auth/Data API (fora do escopo resolver isso aqui).
 
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Aplicar as migrations a um projeto Supabase real e repetir os testes
-   de isolamento via `supabase-js` (não só localmente).
+1. Validar o isolamento entre tenants via HTTP contra o Neon real (de um
+   ambiente sem a restrição de rede deste sandbox).
 2. Tarefa 03 — sistema configurável de usuários/perfis/permissões,
    substituindo o enum fixo `memberships.role`.
 3. Tarefa 04 — catálogo (categorias, produtos, preços), estações de

@@ -8,20 +8,26 @@
 - **Variáveis de ambiente**: `.env.example` documenta as chaves
   necessárias sem valores reais; `.env*` está no `.gitignore` (com exceção
   explícita para `.env.example`). Nenhum secret real é commitado.
-- **Nenhuma Service Role Key no navegador**: `src/lib/supabase/admin.ts`
-  importa `server-only`, o que quebra o build se o módulo for alcançado
-  por código client. Componentes/hooks client só podem usar
-  `src/lib/supabase/client.ts`, que carrega apenas a anon key.
-- **Separação client/server explícita**: três entradas diferentes para o
-  Supabase (`client.ts`, `server.ts`, `admin.ts`), cada uma com um único
-  uso pretendido, em vez de um client genérico reaproveitado em todo
-  lugar.
-- **RLS obrigatório e testado (Tarefa 02)**: `tenants`, `units`,
-  `memberships`, `profiles` e `audit_log` têm `ENABLE` + `FORCE ROW LEVEL
-  SECURITY` desde a migration que as cria. Isolamento entre tenants foi
-  validado com um Postgres local simulando dois tenants e três usuários —
-  ver `docs/database.md` para o detalhe dos 9 cenários testados
-  (cross-tenant read/write, auto-promoção de role, acesso anônimo).
+- **Nenhuma connection string privilegiada no navegador**:
+  `src/lib/db/admin.ts` importa `server-only`, o que quebra o build se o
+  módulo for alcançado por código client. Componentes/hooks client só
+  podem usar `src/lib/db/client.ts`, que fala com o Neon através da Data
+  API (JWT do usuário, sujeito a RLS) — nunca com a connection string
+  direta.
+- **Separação client/server explícita**: `src/lib/db/client.ts` (Data
+  API, RLS aplicada) vs. `src/lib/db/admin.ts` (conexão direta, role com
+  `BYPASSRLS`), cada um com um único uso pretendido, em vez de um client
+  genérico reaproveitado em todo lugar.
+- **RLS obrigatório, aplicado a um projeto Neon real (Tarefa 02)**:
+  `tenants`, `units`, `memberships`, `profiles` e `audit_log` têm
+  `ENABLE` + `FORCE ROW LEVEL SECURITY` desde a migration que as cria, já
+  aplicadas ao projeto `klikflow` no Neon. As roles da Data API
+  (`authenticated`/`anonymous`) foram confirmadas com `BYPASSRLS = false`
+  — RLS de fato se aplica a elas. O desenho das policies foi validado
+  ponta a ponta (9 cenários: cross-tenant read/write, auto-promoção de
+  role, acesso anônimo) contra um Postgres local antes da migração para
+  Neon; ver `docs/database.md` para o detalhe e para a validação
+  comportamental ainda pendente contra o Neon real.
 - **`tenant_id` nunca é confiado vindo do cliente**: toda política usa
   `is_tenant_member()`/`is_tenant_admin()`, que resolvem a associação
   usuário↔tenant a partir de `auth.uid()` no banco, não de um valor
@@ -32,22 +38,22 @@
   owner. Ver `docs/database.md` para o porquê (inclui um bug real de RLS
   encontrado e corrigido durante esta tarefa).
 - **Auditoria não é client-writable**: `audit_log` não tem política de
-  INSERT/UPDATE/DELETE para `authenticated`/`anon` — só leitura para
+  INSERT/UPDATE/DELETE para `authenticated`/`anonymous` — só leitura para
   admins do próprio tenant. Escrita será feita futuramente por código de
-  servidor com a service role.
+  servidor usando `src/lib/db/admin.ts` (fora da Data API).
 
 ## O que ainda não existe (intencionalmente)
 
-- Fluxo de autenticação completo (login/signup) — apenas o helper de
-  leitura de sessão (`src/lib/auth/session.ts`), o middleware de refresh
-  de sessão (`middleware.ts`) e o trigger `handle_new_user()`
-  (cria `profiles` no signup) estão prontos.
+- Fluxo de autenticação completo (login/signup) — apenas a infraestrutura
+  está pronta: o proxy obrigatório (`src/app/api/auth/[...path]/route.ts`),
+  o helper de leitura de sessão (`src/lib/auth/session.ts`) e o trigger
+  `handle_new_user()` (cria `profiles` no signup).
 - Sistema de permissões/roles configurável — `memberships.role` hoje é um
   enum fixo (`owner`/`manager`/`staff`), suficiente para a RLS desta
   etapa. O sistema configurável de perfis/permissões é escopo da Tarefa
   03.
-- As migrations ainda não foram aplicadas a um projeto Supabase real
-  (limite de projetos do plano gratuito da organização — ver
+- Validação comportamental via HTTP contra o Neon real (bloqueada pela
+  política de rede deste ambiente de desenvolvimento — ver
   `docs/database.md`).
 
 ## Checklist para as próximas etapas
