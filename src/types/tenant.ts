@@ -1,29 +1,16 @@
+import type { Database, TenantSegment } from "@/types/database";
+
 /**
- * Domain-level shape of the future multi-tenancy hierarchy.
- * No table exists yet — these types only fix the vocabulary the rest of the
- * codebase should use (see /docs/architecture.md) so features written before
- * the schema lands still speak the same language.
+ * Re-exports of the real `tenants`/`units` rows (see
+ * `supabase/migrations/0004_core_multitenancy.sql`), under the domain
+ * names the product uses. `ConsumptionLocation` has no table yet — it is
+ * Task 04 scope — and stays here only to fix the vocabulary.
  */
-export interface Tenant {
-  id: string;
-  name: string;
-  segment: BusinessSegment;
-}
+export type Tenant = Database["public"]["Tables"]["tenants"]["Row"];
+export type Unit = Database["public"]["Tables"]["units"]["Row"];
+export type Membership = Database["public"]["Tables"]["memberships"]["Row"];
 
-export type BusinessSegment =
-  | "cafeteria"
-  | "restaurant"
-  | "bar"
-  | "hotel"
-  | "clinic"
-  | "convenience"
-  | "other";
-
-export interface Unit {
-  id: string;
-  tenantId: string;
-  name: string;
-}
+export type { TenantSegment };
 
 export interface ConsumptionLocation {
   id: string;

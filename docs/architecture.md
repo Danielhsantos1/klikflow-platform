@@ -73,15 +73,18 @@ Cada pasta em `features/*` está vazia (apenas `.gitkeep`) nesta etapa —
 elas existem para fixar onde o código de cada domínio deve nascer, sem
 antecipar sua implementação.
 
-## Hierarquia multi-tenant (planejada, ainda não implementada)
+## Hierarquia multi-tenant
 
 ```
-Tenant → Unit → Users → Products → Orders → Payments
+Tenant → Unit → Users (via Membership) → Products → Orders → Payments
 ```
 
-O tipo `src/types/tenant.ts` fixa esse vocabulário. Nenhuma tabela foi
-criada ainda; quando o schema nascer, toda entidade de negócio deverá
-carregar `tenant_id` e ser protegida por política RLS equivalente.
+Implementada desde a Tarefa 02 em `supabase/migrations/`. Ver
+`docs/database.md` para o detalhamento do schema, das políticas RLS e da
+estratégia de auth. `src/types/tenant.ts` e `src/types/database.ts`
+espelham essas tabelas em TypeScript. Toda entidade de negócio futura
+(produtos, comandas, pedidos, pagamentos) deverá seguir o mesmo padrão:
+`tenant_id not null` + RLS na mesma migration que cria a tabela.
 
 ## Supabase
 
@@ -97,8 +100,11 @@ Três clients, cada um com um propósito e superfície de confiança distintos:
 - `src/lib/supabase/middleware.ts` + `middleware.ts` — renova a sessão a
   cada request.
 
-`src/types/database.ts` é um placeholder até existir schema; será
-substituído por `npx supabase gen types typescript`.
+`src/types/database.ts` é escrito manualmente espelhando
+`supabase/migrations/*.sql` (o ambiente de desenvolvimento não tem Docker
+para rodar `supabase gen types` localmente). Assim que as migrations
+forem aplicadas a um projeto Supabase real, deve ser regenerado com
+`npx supabase gen types typescript --project-id <project-id>`.
 
 ## Por que nada de lógica de negócio ainda
 

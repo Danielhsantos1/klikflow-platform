@@ -34,6 +34,25 @@ npm run dev
   Estação de Produção) — nunca usar termos de um segmento específico
   (mesa, cozinha, garçom, hambúrguer) em código ou schema.
 
+## Migrations do banco
+
+Vivem em `supabase/migrations/*.sql`, numeradas e aplicadas em ordem.
+Nunca editar uma migration já aplicada — criar uma nova.
+
+```bash
+npx supabase link --project-ref <project-ref>
+npx supabase db push       # aplica as migrations pendentes
+```
+
+Depois de aplicar, regenerar os tipos:
+
+```bash
+npx supabase gen types typescript --project-id <project-ref> > src/types/database.ts
+```
+
+Ver `docs/database.md` para o schema, a estratégia de RLS e os testes de
+isolamento já executados.
+
 ## Deploy
 
 Vercel, conectado ao branch principal do GitHub. Variáveis de ambiente do

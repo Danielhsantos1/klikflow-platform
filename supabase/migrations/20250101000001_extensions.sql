@@ -1,0 +1,4 @@
+-- gen_random_uuid() has been part of Postgres core since v13, so no
+-- extension is required for it. This migration is kept as an explicit,
+-- versioned place to enable future extensions (e.g. pg_trgm for search)
+-- instead of adding them ad-hoc inside feature migrations.

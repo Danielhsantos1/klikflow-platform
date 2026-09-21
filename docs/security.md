@@ -16,25 +16,44 @@
   Supabase (`client.ts`, `server.ts`, `admin.ts`), cada uma com um único
   uso pretendido, em vez de um client genérico reaproveitado em todo
   lugar.
-- **Arquitetura preparada para RLS**: o vocabulário de multi-tenancy
-  (`Tenant → Unit → Users → Products → Orders → Payments`, ver
-  `src/types/tenant.ts`) já assume que toda tabela de negócio terá
-  `tenant_id` e uma política RLS correspondente quando o schema for
-  criado. Nenhuma tabela existe ainda, então nenhuma política foi escrita
-  — mas nenhuma decisão desta etapa impede isso.
+- **RLS obrigatório e testado (Tarefa 02)**: `tenants`, `units`,
+  `memberships`, `profiles` e `audit_log` têm `ENABLE` + `FORCE ROW LEVEL
+  SECURITY` desde a migration que as cria. Isolamento entre tenants foi
+  validado com um Postgres local simulando dois tenants e três usuários —
+  ver `docs/database.md` para o detalhe dos 9 cenários testados
+  (cross-tenant read/write, auto-promoção de role, acesso anônimo).
+- **`tenant_id` nunca é confiado vindo do cliente**: toda política usa
+  `is_tenant_member()`/`is_tenant_admin()`, que resolvem a associação
+  usuário↔tenant a partir de `auth.uid()` no banco, não de um valor
+  enviado na query.
+- **Criação de tenant via RPC, não INSERT direto**: não existe política
+  de INSERT em `tenants`; só a função `create_tenant()` (`SECURITY
+  DEFINER`) pode criar um tenant, garantindo que ele nasça sempre com um
+  owner. Ver `docs/database.md` para o porquê (inclui um bug real de RLS
+  encontrado e corrigido durante esta tarefa).
+- **Auditoria não é client-writable**: `audit_log` não tem política de
+  INSERT/UPDATE/DELETE para `authenticated`/`anon` — só leitura para
+  admins do próprio tenant. Escrita será feita futuramente por código de
+  servidor com a service role.
 
 ## O que ainda não existe (intencionalmente)
 
-- Schema de banco de dados e políticas RLS reais.
 - Fluxo de autenticação completo (login/signup) — apenas o helper de
-  leitura de sessão (`src/lib/auth/session.ts`) e o middleware de refresh
-  de sessão (`middleware.ts`) estão prontos.
-- Sistema de permissões/roles com enforcement — `src/lib/permissions/`
-  hoje só define o vocabulário (`Role`, `Permission`, `Profile`).
+  leitura de sessão (`src/lib/auth/session.ts`), o middleware de refresh
+  de sessão (`middleware.ts`) e o trigger `handle_new_user()`
+  (cria `profiles` no signup) estão prontos.
+- Sistema de permissões/roles configurável — `memberships.role` hoje é um
+  enum fixo (`owner`/`manager`/`staff`), suficiente para a RLS desta
+  etapa. O sistema configurável de perfis/permissões é escopo da Tarefa
+  03.
+- As migrations ainda não foram aplicadas a um projeto Supabase real
+  (limite de projetos do plano gratuito da organização — ver
+  `docs/database.md`).
 
 ## Checklist para as próximas etapas
 
-- Toda nova tabela de negócio deve nascer com `tenant_id` + política RLS.
+- Toda nova tabela de negócio deve nascer com `tenant_id` + política RLS
+  na mesma migration (padrão já seguido em `0004_core_multitenancy.sql`).
 - Nenhuma rota server deve confiar em dados de tenant vindos do cliente
   sem revalidar contra a sessão autenticada.
 - `admin.ts` só deve ser chamado a partir de Route Handlers/Server Actions
