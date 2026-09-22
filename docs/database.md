@@ -1,10 +1,11 @@
-# Banco de dados — Tarefas 02, 03 e 04
+# Banco de dados — Tarefas 02 a 05
 
 Schema de multi-tenancy, autenticação, RLS (Tarefa 02), sistema
-configurável de perfis/permissões (Tarefa 03) e catálogo/produção/locais
-de consumo (Tarefa 04). Vive em `db/migrations/*.sql`, versionado e
-aplicado via SQL direto (não há CLI de migrations dedicado no fluxo
-atual — ver "Como aplicar" abaixo).
+configurável de perfis/permissões (Tarefa 03), catálogo/produção/locais
+de consumo (Tarefa 04) e o núcleo transacional Comanda + Pedidos
+(Tarefa 05). Vive em `db/migrations/*.sql`, versionado e aplicado via SQL
+direto (não há CLI de migrations dedicado no fluxo atual — ver "Como
+aplicar" abaixo).
 
 ## Provedor: Neon (não Supabase)
 
@@ -36,7 +37,7 @@ relacionado.
 
 ## Como aplicar as migrations
 
-As 7 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
+As 8 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
 `production`) via MCP do Neon (`run_sql_transaction`), na ordem dos
 arquivos. Para reaplicar em outro branch/projeto:
 
@@ -60,6 +61,7 @@ existe um estado intermediário exposto.
 | `0005_audit_log.sql` | Tabela `audit_log` append-only, somente leitura para admins do tenant. |
 | `0006_permissions_roles.sql` | Tarefa 03: `permissions` (catálogo fixo), `roles` (Perfis configuráveis por tenant), `role_permissions`, função `has_permission()` (substitui `is_tenant_admin`), triggers de proteção (`protect_system_role`, `protect_last_owner_membership`), `memberships.role` (enum fixo) trocado por `memberships.role_id` (FK para `roles`), `create_tenant()` atualizado para criar o Perfil "Proprietário". |
 | `0007_catalog.sql` | Tarefa 04: `categories`, `products` (com `price`/`image_url`), `production_stations` (Estação de Produção), `product_stations` (associação produto↔estação), `consumption_locations` (Local de Consumo, sob `units`). 3 novas permissões (`catalog.manage`, `production_stations.manage`, `consumption_locations.manage`) e o trigger `check_product_category_same_tenant`. |
+| `0008_tabs_orders.sql` | Tarefa 05: `tabs` (Comanda), `orders` (Pedido, status fixo por enquanto), `order_items` (itens com snapshot de nome/preço). 2 novas permissões (`tabs.manage`, `orders.manage`). Triggers: `check_tab_location_same_tenant`, `check_order_tab_same_tenant_and_open`, `snapshot_order_item` (ignora preço/nome enviados pelo cliente). |
 
 ## Entidades
 
@@ -103,6 +105,21 @@ existe um estado intermediário exposto.
 - **`consumption_locations`** *(Tarefa 04)* — Local de Consumo (Mesa 01,
   Balcão 02, Quarto 103...). Pertence a uma `unit`, não diretamente ao
   tenant — reflete a hierarquia Tenant → Unit → Local de Consumo.
+- **`tabs`** *(Tarefa 05)* — a Comanda: agrupa o consumo de um Local de
+  Consumo entre a abertura e o fechamento (`status`: `open`/`closed`).
+  Um índice único garante no máximo uma comanda `open` por Local de
+  Consumo por vez.
+- **`orders`** *(Tarefa 05)* — o Pedido, pertence a uma `tab`. `status`
+  é um enum fixo (`new` → `accepted` → `in_production` → `ready` →
+  `delivered` → `completed`, mais `cancelled`) — a máquina de
+  transições **configurável** por tenant é escopo da Tarefa 06; aqui só
+  existe o enum e a permissão `orders.manage` para mudar o status.
+- **`order_items`** *(Tarefa 05)* — os itens do pedido. `product_name` e
+  `unit_price` são um **snapshot** do produto no instante da compra,
+  gravado por uma trigger que ignora qualquer valor enviado pelo
+  cliente — nunca reflete uma mudança de preço/nome posterior em
+  `products` (ver princípio de histórico, seção 26 da direção mestre).
+  Sem política de UPDATE/DELETE: um item lançado é permanente.
 
 ### De `memberships.role` (Tarefa 02) para `memberships.role_id` (Tarefa 03)
 
@@ -219,6 +236,19 @@ futura consegue contornar isso, mesmo sem checagem própria.
 | `production_stations` | membro | `production_stations.manage` | `production_stations.manage` | `production_stations.manage` |
 | `product_stations` | membro (via `products.tenant_id`) | `catalog.manage` (via `products.tenant_id`) | `catalog.manage` (via `products.tenant_id`) | `catalog.manage` (via `products.tenant_id`) |
 | `consumption_locations` | membro (via `units.tenant_id`) | `consumption_locations.manage` (via `units.tenant_id`) | `consumption_locations.manage` (via `units.tenant_id`) | `consumption_locations.manage` (via `units.tenant_id`) |
+| `tabs` | membro | `tabs.manage`\*\*\*\* | `tabs.manage`\*\*\*\* | — (fecha via `status`) |
+| `orders` | membro | `orders.manage`\*\*\*\*\* | `orders.manage` | — (cancela via `status`) |
+| `order_items` | membro (via `orders.tenant_id`) | `orders.manage` (via `orders.tenant_id`)\*\*\*\*\*\* | — (imutável) | — (imutável) |
+
+\*\*\*\* também sujeito a `check_tab_location_same_tenant()` — o Local de
+Consumo de uma comanda precisa ser do mesmo tenant; e a um índice único
+que impede duas comandas `open` no mesmo Local de Consumo.
+\*\*\*\*\* também sujeito a `check_order_tab_same_tenant_and_open()` — a
+comanda de um pedido precisa ser do mesmo tenant e estar `open` (só na
+criação).
+\*\*\*\*\*\* também sujeito a `snapshot_order_item()` — grava
+`product_name`/`unit_price` a partir do produto real, ignorando o que o
+cliente enviar, e valida que o produto é do mesmo tenant do pedido.
 
 \*\*\* também sujeito a `check_product_category_same_tenant()` — a
 `category_id` de um produto precisa pertencer ao mesmo tenant do produto.
@@ -236,19 +266,47 @@ checagem de RLS.
 
 ### Estrutural (feita contra o projeto Neon real)
 
-Confirmado via `pg_class`/`pg_policies` depois de aplicar as 7
+Confirmado via `pg_class`/`pg_policies` depois de aplicar as 8
 migrations no projeto `klikflow`:
 
-- `relrowsecurity` e `relforcerowsecurity` = `true` nas 13 tabelas
+- `relrowsecurity` e `relforcerowsecurity` = `true` nas 16 tabelas
   (`profiles`, `tenants`, `units`, `memberships`, `audit_log`,
   `permissions`, `roles`, `role_permissions`, `categories`, `products`,
-  `production_stations`, `product_stations`, `consumption_locations`).
+  `production_stations`, `product_stations`, `consumption_locations`,
+  `tabs`, `orders`, `order_items`).
 - Roles `authenticated` e `anonymous` da Data API confirmadas com
   `rolbypassrls = false` (RLS realmente se aplica a elas) — diferente da
   role `klikflow_owner`/`klikflow_app`, que tem `BYPASSRLS = true` e não
   pode ser alterada via SQL (limitação da plataforma Neon).
 - `auth.uid()` confirmada como função real (`pg_session_jwt`), retornando
   `uuid`.
+
+### Comportamental — Tarefa 05 (simulado via SQL, `klikflow_owner`)
+
+Fluxo completo testado contra o Neon real: comanda aberta num Local de
+Consumo → pedido lançado na comanda → item de pedido criado. Depois:
+
+1. **Snapshot de preço confirmado de verdade**: o item ficou com
+   `unit_price = 12.00`; o preço do produto foi alterado para `20.00`
+   depois; reconsultando o item, ele continua em `12.00`. ✅
+2. Tentativa de abrir uma **segunda comanda** no mesmo Local de Consumo
+   → bloqueada pelo índice único `tabs_one_open_per_location_idx`. ✅
+3. Tentativa de lançar um **pedido numa comanda fechada** → bloqueada
+   por `check_order_tab_same_tenant_and_open()` com *"cannot add an
+   order to a closed tab"*. ✅
+4. Tentativa de criar um **item de pedido usando produto de outro
+   tenant** → bloqueada por `snapshot_order_item()` com *"product must
+   belong to the same tenant as the order"*. ✅
+
+### Comportamental via HTTP real — Tarefa 05 (pendente de confirmação)
+
+`scripts/test-orders.browser.js` repete os cenários acima via HTTP real,
+incluindo uma tentativa explícita do cliente de **mentir o preço e o
+nome do item** (`unit_price: 0.01`, `product_name: "Free beer"`) — o
+teste confirma que a trigger ignora esses valores e grava o preço/nome
+reais do produto. Rodar do mesmo jeito de sempre, e **lembrar de
+atualizar o cache de schema da Data API antes** (ver
+`docs/development.md`).
 
 ### Comportamental — Tarefa 04 (simulado via SQL, `klikflow_owner`)
 

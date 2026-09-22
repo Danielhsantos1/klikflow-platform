@@ -105,14 +105,37 @@ do Supabase). O resultado final está no Neon.
 - Nenhuma UI de catálogo (cardápio, cadastro de produto) criada — fora
   do escopo desta tarefa.
 
+## Concluído (Tarefa 05 — Comanda + Pedidos)
+
+- `db/migrations/0008_tabs_orders.sql` aplicada ao projeto Neon real:
+  `tabs` (Comanda), `orders` (Pedido, status fixo por enquanto —
+  a máquina de transições configurável é escopo da Tarefa 06),
+  `order_items` (itens com snapshot de nome/preço do produto).
+- 2 novas permissões (`tabs.manage`, `orders.manage`).
+- Snapshot de preço/nome **confirmado de verdade** contra o Neon real:
+  um item mantém o preço no momento da compra mesmo depois do produto
+  mudar de preço; a trigger `snapshot_order_item()` ignora qualquer
+  preço/nome que o cliente tente enviar no INSERT.
+- Três proteções testadas de verdade contra o Neon (via SQL e depois via
+  HTTP): só uma comanda `open` por Local de Consumo por vez; não dá para
+  lançar pedido numa comanda fechada; item de pedido não pode usar
+  produto de outro tenant.
+- `src/types/database.ts` (tabelas `tabs`/`orders`/`order_items`) e
+  `src/types/order.ts` (novo, tipos de domínio) criados.
+- `scripts/test-orders.browser.js` criado — inclui uma tentativa
+  explícita do cliente de mentir preço/nome do item, confirmando que a
+  trigger ignora e grava os valores reais.
+- **Pendente**: rodar esse script no navegador e confirmar o resultado.
+- Nenhuma UI de comanda/pedido criada — fora do escopo desta tarefa.
+
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Tarefa 05 — Comanda + Pedidos (núcleo transacional). Itens de pedido
-   devem gravar snapshot do preço/nome do produto no momento da compra,
-   nunca reconsultar `products` depois.
-2. Tarefa 06 — Produção, status configurável, Realtime.
+1. Confirmar a validação via HTTP da Tarefa 05 contra o Neon real.
+2. Tarefa 06 — Produção, status configurável (máquina de transições por
+   tenant, não mais um enum fixo), Realtime.
 3. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
-   — inclui a primeira UI real de catálogo e de gestão de usuários/perfis.
+   — inclui a primeira UI real de catálogo, comandas/pedidos e gestão de
+   usuários/perfis.
 4. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o

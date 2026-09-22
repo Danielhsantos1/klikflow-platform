@@ -40,9 +40,20 @@ export type PermissionKey =
   | "audit_log.read"
   | "catalog.manage"
   | "production_stations.manage"
-  | "consumption_locations.manage";
+  | "consumption_locations.manage"
+  | "tabs.manage"
+  | "orders.manage";
 
 export type CatalogStatus = "active" | "archived";
+export type TabStatus = "open" | "closed";
+export type OrderStatus =
+  | "new"
+  | "accepted"
+  | "in_production"
+  | "ready"
+  | "delivered"
+  | "completed"
+  | "cancelled";
 
 export interface Database {
   public: {
@@ -402,6 +413,125 @@ export interface Database {
             foreignKeyName: "consumption_locations_unit_id_fkey";
             columns: ["unit_id"];
             referencedRelation: "units";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tabs: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          consumption_location_id: string;
+          status: TabStatus;
+          opened_by: string;
+          closed_by: string | null;
+          opened_at: string;
+          closed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          consumption_location_id: string;
+          opened_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          status?: TabStatus;
+          closed_by?: string | null;
+          closed_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tabs_tenant_id_fkey";
+            columns: ["tenant_id"];
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tabs_consumption_location_id_fkey";
+            columns: ["consumption_location_id"];
+            referencedRelation: "consumption_locations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      orders: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          tab_id: string;
+          status: OrderStatus;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          tab_id: string;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          status?: OrderStatus;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "orders_tenant_id_fkey";
+            columns: ["tenant_id"];
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "orders_tab_id_fkey";
+            columns: ["tab_id"];
+            referencedRelation: "tabs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      order_items: {
+        Row: {
+          id: string;
+          order_id: string;
+          product_id: string;
+          product_name: string;
+          unit_price: string;
+          quantity: number;
+          notes: string | null;
+          created_at: string;
+        };
+        // No product_name/unit_price here: the snapshot_order_item()
+        // trigger always overwrites them from the live product row,
+        // ignoring anything the client sends — never trust a
+        // client-supplied price.
+        Insert: {
+          id?: string;
+          order_id: string;
+          product_id: string;
+          quantity: number;
+          notes?: string | null;
+          created_at?: string;
+        };
+        // No Update: an order item is immutable once created.
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey";
+            columns: ["order_id"];
+            referencedRelation: "orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
             referencedColumns: ["id"];
           },
         ];

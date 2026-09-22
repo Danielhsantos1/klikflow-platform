@@ -52,6 +52,15 @@
   INSERT/UPDATE/DELETE para `authenticated`/`anonymous` — só leitura para
   admins do próprio tenant. Escrita será feita futuramente por código de
   servidor usando `src/lib/db/admin.ts` (fora da Data API).
+- **Preço/nome do item de pedido nunca vêm do cliente (Tarefa 05)**: a
+  trigger `snapshot_order_item()` sempre sobrescreve `product_name` e
+  `unit_price` com os valores reais de `products` no momento do INSERT,
+  ignorando qualquer valor que o cliente envie — testado enviando um
+  preço falso de propósito, e o banco gravou o preço real. Itens não têm
+  política de UPDATE/DELETE: são permanentes, preservando o histórico
+  mesmo que o produto mude de preço depois.
+- **Uma comanda fechada não aceita novos pedidos**: enforced por trigger
+  (`check_order_tab_same_tenant_and_open()`), não pelo app.
 
 ## O que ainda não existe (intencionalmente)
 
@@ -66,6 +75,11 @@
 - Tela de catálogo/cardápio (Tarefa 04) — schema pronto e testado via
   HTTP real contra o Neon (`7 passed, 0 failed`, ver `docs/database.md`),
   mas nenhuma UI foi criada.
+- Tela de comanda/pedido (Tarefa 05) — schema pronto e testado via SQL
+  contra o Neon real; confirmação via HTTP
+  (`scripts/test-orders.browser.js`) pendente de execução; nenhuma UI
+  criada. Máquina de status configurável (impedir pular etapas) é
+  escopo da Tarefa 06 — hoje o `status` do pedido é só um enum fixo.
 
 ## Checklist para as próximas etapas
 
