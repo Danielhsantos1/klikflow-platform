@@ -190,25 +190,25 @@ do Supabase). O resultado final está no Neon.
 - `src/components/ui/input.tsx` (novo, mesmo padrão do `Button`).
 - **Testado localmente**: `npm run build` sem erros; `/`, `/login` e
   `/signup` respondem 200; `/app` sem sessão redireciona (307) para
-  `/login`, confirmando o guard de rota. O fluxo completo de
-  signup/login/logout (que depende do Neon Auth real) fica para o
-  usuário confirmar em `https://klikflow.vercel.app` — dessa vez **não
-  precisa de Console/DevTools**, é só usar a tela normalmente, inclusive
-  pelo celular.
+  `/login`, confirmando o guard de rota.
+- **Fechado**: fluxo completo confirmado pelo usuário direto no celular
+  contra `https://klikflow.vercel.app`, sem Console/DevTools — signup
+  criou a conta e levou para `/app` mostrando nome e e-mail reais
+  (Neon Auth), logout voltou para `/login`, e login de novo com o mesmo
+  e-mail/senha funcionou. Primeira tarefa validada de ponta a ponta
+  inteiramente pela UI real, em vez de scripts de navegador.
 - Nenhuma tela de negócio (catálogo, comanda, produção) criada ainda —
   essa é a próxima tarefa.
 
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar no navegador (inclusive pelo celular) que
-   signup → login → `/app` → logout funcionam contra o Neon real.
-2. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
+1. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
    Neon real, quando o usuário estiver num computador.
-3. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
+2. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
    — inclui a primeira UI real de catálogo, comandas/pedidos, produção e
    gestão de usuários/perfis.
-4. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
-5. SaaS Admin (administração da plataforma, cross-tenant).
+3. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
+4. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
 mesmo cuidado de não antecipar funcionalidades fora do escopo pedido.

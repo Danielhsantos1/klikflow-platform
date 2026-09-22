@@ -81,12 +81,13 @@
 
 ## O que ainda não existe (intencionalmente)
 
-- Fluxo de autenticação completo (login/signup) — UI real criada na
-  Tarefa 07 (`/login`, `/signup`, `/app`), usando a infraestrutura que já
-  existia desde a Tarefa 01: o proxy obrigatório
-  (`src/app/api/auth/[...path]/route.ts`), o helper de leitura de sessão
-  (`src/lib/auth/session.ts`) e o trigger `handle_new_user()` (cria
-  `profiles` no signup).
+- ~~Fluxo de autenticação completo (login/signup)~~ — **fechado na
+  Tarefa 07**: UI real (`/login`, `/signup`, `/app`) sobre a
+  infraestrutura que já existia desde a Tarefa 01 (proxy
+  `src/app/api/auth/[...path]/route.ts`, `src/lib/auth/session.ts`,
+  trigger `handle_new_user()`). Confirmado pelo usuário direto no
+  celular contra `https://klikflow.vercel.app`: signup, sessão
+  protegida em `/app` e logout/login funcionam de ponta a ponta.
 - Tela de gestão de Perfis/permissões (convidar usuário, criar Perfil,
   marcar permissões) — o backend (Tarefa 03) está pronto e testado via
   Data API (`10 passed, 0 failed`, ver `docs/database.md`), mas nenhuma
