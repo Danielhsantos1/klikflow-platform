@@ -74,12 +74,19 @@
   trigger `seed_order_item_stations()` (a partir de `product_stations`
   do produto), nunca escolhidas livremente pelo cliente.
 
+- **Rota `/app` protegida no servidor, não no cliente (Tarefa 07)**: o
+  guard usa `getCurrentUser()` num Server Component e redireciona antes
+  de qualquer HTML sensível ser enviado — não é uma checagem client-side
+  que poderia ser contornada desabilitando JS.
+
 ## O que ainda não existe (intencionalmente)
 
-- Fluxo de autenticação completo (login/signup) — apenas a infraestrutura
-  está pronta: o proxy obrigatório (`src/app/api/auth/[...path]/route.ts`),
-  o helper de leitura de sessão (`src/lib/auth/session.ts`) e o trigger
-  `handle_new_user()` (cria `profiles` no signup).
+- Fluxo de autenticação completo (login/signup) — UI real criada na
+  Tarefa 07 (`/login`, `/signup`, `/app`), usando a infraestrutura que já
+  existia desde a Tarefa 01: o proxy obrigatório
+  (`src/app/api/auth/[...path]/route.ts`), o helper de leitura de sessão
+  (`src/lib/auth/session.ts`) e o trigger `handle_new_user()` (cria
+  `profiles` no signup).
 - Tela de gestão de Perfis/permissões (convidar usuário, criar Perfil,
   marcar permissões) — o backend (Tarefa 03) está pronto e testado via
   Data API (`10 passed, 0 failed`, ver `docs/database.md`), mas nenhuma

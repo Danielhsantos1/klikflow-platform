@@ -170,15 +170,45 @@ do Supabase). O resultado final está no Neon.
   agora, sem consumidor, seria trabalho especulativo.
 - Nenhuma UI de produção/status criada — fora do escopo desta tarefa.
 
+## Concluído (Tarefa 07 — Autenticação: login e cadastro)
+
+- Primeira UI real do produto: `/login` e `/signup`, usando o client
+  `createAuthClient()` de `@neondatabase/auth/next` (`src/lib/auth/client.ts`)
+  contra o proxy same-origin já existente
+  (`src/app/api/auth/[...path]/route.ts`), sem nenhuma URL de auth
+  hardcoded no cliente.
+- `src/features/auth/components/`: `LoginForm`, `SignupForm` e
+  `SignOutButton` — Client Components mínimos (email/senha, e nome no
+  cadastro), com erro exibido inline e redirecionamento para `/app` no
+  sucesso.
+- `/app`: primeira rota protegida de verdade, um Server Component que
+  usa `getCurrentUser()` (já existia desde a Tarefa 01) e redireciona
+  para `/login` se não houver sessão — prova de ponta a ponta que a
+  infraestrutura de auth (proxy + `pg_session_jwt`) funciona com uma UI
+  real, não só via scripts de Console.
+- Landing (`/`) ganhou os botões "Entrar" / "Criar conta".
+- `src/components/ui/input.tsx` (novo, mesmo padrão do `Button`).
+- **Testado localmente**: `npm run build` sem erros; `/`, `/login` e
+  `/signup` respondem 200; `/app` sem sessão redireciona (307) para
+  `/login`, confirmando o guard de rota. O fluxo completo de
+  signup/login/logout (que depende do Neon Auth real) fica para o
+  usuário confirmar em `https://klikflow.vercel.app` — dessa vez **não
+  precisa de Console/DevTools**, é só usar a tela normalmente, inclusive
+  pelo celular.
+- Nenhuma tela de negócio (catálogo, comanda, produção) criada ainda —
+  essa é a próxima tarefa.
+
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
+1. Confirmar no navegador (inclusive pelo celular) que
+   signup → login → `/app` → logout funcionam contra o Neon real.
+2. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
    Neon real, quando o usuário estiver num computador.
-2. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
+3. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
    — inclui a primeira UI real de catálogo, comandas/pedidos, produção e
    gestão de usuários/perfis.
-3. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
-4. SaaS Admin (administração da plataforma, cross-tenant).
+4. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
+5. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
 mesmo cuidado de não antecipar funcionalidades fora do escopo pedido.

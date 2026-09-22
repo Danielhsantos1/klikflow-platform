@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { appConfig } from "@/config/app";
+import { buttonVariants } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -10,6 +13,14 @@ export default function Home() {
       <p className="max-w-md text-sm text-neutral-400">
         {appConfig.description}
       </p>
+      <div className="mt-4 flex gap-3">
+        <Link href="/login" className={buttonVariants({ variant: "default" })}>
+          Entrar
+        </Link>
+        <Link href="/signup" className={buttonVariants({ variant: "outline" })}>
+          Criar conta
+        </Link>
+      </div>
     </main>
   );
 }
