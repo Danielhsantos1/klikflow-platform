@@ -61,6 +61,18 @@
   mesmo que o produto mude de preço depois.
 - **Uma comanda fechada não aceita novos pedidos**: enforced por trigger
   (`check_order_tab_same_tenant_and_open()`), não pelo app.
+- **Transições de status de pedido são controladas, não um UPDATE livre
+  (Tarefa 06)**: `validate_order_status_transition()` só aceita a
+  mudança de `orders.status_id` se existir uma linha correspondente em
+  `order_status_transitions` para aquele tenant — testado contra o Neon
+  real: uma transição pulando etapas (Aceito → Finalizado) foi
+  corretamente bloqueada com exceção. `orders.configure_statuses` é a
+  permissão que controla quem pode reconfigurar o fluxo de um tenant.
+- **Item de produção só pode ser atualizado por quem tem
+  `production.manage` (Tarefa 06)**: `order_item_stations` não tem
+  política de INSERT/DELETE para o cliente — as linhas só nascem via
+  trigger `seed_order_item_stations()` (a partir de `product_stations`
+  do produto), nunca escolhidas livremente pelo cliente.
 
 ## O que ainda não existe (intencionalmente)
 
@@ -78,8 +90,12 @@
 - Tela de comanda/pedido (Tarefa 05) — schema pronto e testado via SQL
   contra o Neon real; confirmação via HTTP
   (`scripts/test-orders.browser.js`) pendente de execução; nenhuma UI
-  criada. Máquina de status configurável (impedir pular etapas) é
-  escopo da Tarefa 06 — hoje o `status` do pedido é só um enum fixo.
+  criada.
+- Tela de produção/status (Tarefa 06) — máquina de transições
+  configurável e acompanhamento por Estação de Produção prontos e
+  testados via SQL contra o Neon real; confirmação via HTTP
+  (`scripts/test-production-status.browser.js`) pendente de execução;
+  nenhuma UI criada.
 
 ## Checklist para as próximas etapas
 

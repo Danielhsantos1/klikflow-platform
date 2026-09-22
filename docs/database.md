@@ -1,9 +1,10 @@
-# Banco de dados — Tarefas 02 a 05
+# Banco de dados — Tarefas 02 a 06
 
 Schema de multi-tenancy, autenticação, RLS (Tarefa 02), sistema
 configurável de perfis/permissões (Tarefa 03), catálogo/produção/locais
-de consumo (Tarefa 04) e o núcleo transacional Comanda + Pedidos
-(Tarefa 05). Vive em `db/migrations/*.sql`, versionado e aplicado via SQL
+de consumo (Tarefa 04), o núcleo transacional Comanda + Pedidos
+(Tarefa 05) e status de pedido configurável + rastreamento de produção
+(Tarefa 06). Vive em `db/migrations/*.sql`, versionado e aplicado via SQL
 direto (não há CLI de migrations dedicado no fluxo atual — ver "Como
 aplicar" abaixo).
 
@@ -37,7 +38,7 @@ relacionado.
 
 ## Como aplicar as migrations
 
-As 8 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
+As 9 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
 `production`) via MCP do Neon (`run_sql_transaction`), na ordem dos
 arquivos. Para reaplicar em outro branch/projeto:
 
@@ -62,6 +63,7 @@ existe um estado intermediário exposto.
 | `0006_permissions_roles.sql` | Tarefa 03: `permissions` (catálogo fixo), `roles` (Perfis configuráveis por tenant), `role_permissions`, função `has_permission()` (substitui `is_tenant_admin`), triggers de proteção (`protect_system_role`, `protect_last_owner_membership`), `memberships.role` (enum fixo) trocado por `memberships.role_id` (FK para `roles`), `create_tenant()` atualizado para criar o Perfil "Proprietário". |
 | `0007_catalog.sql` | Tarefa 04: `categories`, `products` (com `price`/`image_url`), `production_stations` (Estação de Produção), `product_stations` (associação produto↔estação), `consumption_locations` (Local de Consumo, sob `units`). 3 novas permissões (`catalog.manage`, `production_stations.manage`, `consumption_locations.manage`) e o trigger `check_product_category_same_tenant`. |
 | `0008_tabs_orders.sql` | Tarefa 05: `tabs` (Comanda), `orders` (Pedido, status fixo por enquanto), `order_items` (itens com snapshot de nome/preço). 2 novas permissões (`tabs.manage`, `orders.manage`). Triggers: `check_tab_location_same_tenant`, `check_order_tab_same_tenant_and_open`, `snapshot_order_item` (ignora preço/nome enviados pelo cliente). |
+| `0009_production_status.sql` | Tarefa 06: `orders.status` (enum fixo) trocado por `orders.status_id` (FK para `order_statuses`, configurável por tenant); `order_status_transitions` (grafo de transições permitidas); `order_item_stations` (rastreamento de cada item nas Estações de Produção, seedado automaticamente). 2 novas permissões (`orders.configure_statuses`, `production.manage`). `create_tenant()` atualizado para semear o fluxo padrão (Novo→Aceito→Em Produção→Pronto→Entregue→Finalizado, +Cancelado). |
 
 ## Entidades
 
@@ -109,17 +111,34 @@ existe um estado intermediário exposto.
   Consumo entre a abertura e o fechamento (`status`: `open`/`closed`).
   Um índice único garante no máximo uma comanda `open` por Local de
   Consumo por vez.
-- **`orders`** *(Tarefa 05)* — o Pedido, pertence a uma `tab`. `status`
-  é um enum fixo (`new` → `accepted` → `in_production` → `ready` →
-  `delivered` → `completed`, mais `cancelled`) — a máquina de
-  transições **configurável** por tenant é escopo da Tarefa 06; aqui só
-  existe o enum e a permissão `orders.manage` para mudar o status.
+- **`orders`** *(Tarefa 05, `status` trocado por `status_id` na Tarefa
+  06)* — o Pedido, pertence a uma `tab`. `status_id` aponta para
+  `order_statuses`, configurável por tenant (ver abaixo).
 - **`order_items`** *(Tarefa 05)* — os itens do pedido. `product_name` e
   `unit_price` são um **snapshot** do produto no instante da compra,
   gravado por uma trigger que ignora qualquer valor enviado pelo
   cliente — nunca reflete uma mudança de preço/nome posterior em
   `products` (ver princípio de histórico, seção 26 da direção mestre).
   Sem política de UPDATE/DELETE: um item lançado é permanente.
+- **`order_statuses`** *(Tarefa 06)* — os status possíveis de um
+  Pedido, configuráveis por tenant (não mais um enum fixo). `sequence`
+  define o status inicial de um pedido novo; `is_terminal` marca um
+  status do qual não deveria mais sair transição (ex: Finalizado,
+  Cancelado). `create_tenant()` semeia o fluxo padrão descrito na
+  direção mestre (Novo → Aceito → Em Produção → Pronto → Entregue →
+  Finalizado, + Cancelado a partir de qualquer status não-terminal); o
+  tenant pode reconfigurar depois via `orders.configure_statuses`.
+- **`order_status_transitions`** *(Tarefa 06)* — o grafo de transições
+  permitidas entre `order_statuses`. Uma trigger em `orders` rejeita
+  qualquer mudança de `status_id` que não tenha uma linha correspondente
+  aqui — é isso que torna as transições **controladas**, não um `UPDATE`
+  livre (ver seção 14 da direção mestre: "um usuário não poderá
+  simplesmente alterar qualquer status sem possuir autorização").
+- **`order_item_stations`** *(Tarefa 06)* — acompanha cada item do
+  pedido passando pelas Estações de Produção associadas ao produto
+  (`product_stations`, Tarefa 04). Semeado automaticamente quando o item
+  é criado, com `status` inicial `pending`; nenhuma política de
+  INSERT/DELETE — as linhas só existem via a trigger de seed.
 
 ### De `memberships.role` (Tarefa 02) para `memberships.role_id` (Tarefa 03)
 
@@ -239,6 +258,12 @@ futura consegue contornar isso, mesmo sem checagem própria.
 | `tabs` | membro | `tabs.manage`\*\*\*\* | `tabs.manage`\*\*\*\* | — (fecha via `status`) |
 | `orders` | membro | `orders.manage`\*\*\*\*\* | `orders.manage` | — (cancela via `status`) |
 | `order_items` | membro (via `orders.tenant_id`) | `orders.manage` (via `orders.tenant_id`)\*\*\*\*\*\* | — (imutável) | — (imutável) |
+| `order_statuses` | membro | `orders.configure_statuses` | `orders.configure_statuses` | `orders.configure_statuses`\*\*\*\*\*\*\* |
+| `order_status_transitions` | membro | `orders.configure_statuses` | — | `orders.configure_statuses` |
+| `order_item_stations` | membro (via `order_items`→`orders.tenant_id`) | — (só via trigger de seed) | `production.manage` (via `order_items`→`orders.tenant_id`) | — |
+
+\*\*\*\*\*\*\* um status em uso por algum pedido não pode ser excluído — o FK
+`orders.status_id` não tem `on delete cascade`.
 
 \*\*\*\* também sujeito a `check_tab_location_same_tenant()` — o Local de
 Consumo de uma comanda precisa ser do mesmo tenant; e a um índice único
@@ -266,20 +291,47 @@ checagem de RLS.
 
 ### Estrutural (feita contra o projeto Neon real)
 
-Confirmado via `pg_class`/`pg_policies` depois de aplicar as 8
+Confirmado via `pg_class`/`pg_policies` depois de aplicar as 9
 migrations no projeto `klikflow`:
 
-- `relrowsecurity` e `relforcerowsecurity` = `true` nas 16 tabelas
+- `relrowsecurity` e `relforcerowsecurity` = `true` nas 19 tabelas
   (`profiles`, `tenants`, `units`, `memberships`, `audit_log`,
   `permissions`, `roles`, `role_permissions`, `categories`, `products`,
   `production_stations`, `product_stations`, `consumption_locations`,
-  `tabs`, `orders`, `order_items`).
+  `tabs`, `orders`, `order_items`, `order_statuses`,
+  `order_status_transitions`, `order_item_stations`).
 - Roles `authenticated` e `anonymous` da Data API confirmadas com
   `rolbypassrls = false` (RLS realmente se aplica a elas) — diferente da
   role `klikflow_owner`/`klikflow_app`, que tem `BYPASSRLS = true` e não
   pode ser alterada via SQL (limitação da plataforma Neon).
 - `auth.uid()` confirmada como função real (`pg_session_jwt`), retornando
   `uuid`.
+
+### Comportamental — Tarefa 06 (simulado via SQL, `klikflow_owner`)
+
+Fluxo completo testado contra o Neon real: pedido criado **sem
+`status_id` explícito** → a trigger `default_order_status()` atribuiu
+sozinha o status de menor `sequence` ("Novo"); item de pedido criado →
+`order_item_stations` seedado automaticamente com a estação "Cozinha"
+em `pending`. Depois:
+
+1. Transição válida (Novo → Aceito, com transição cadastrada) → aceita
+   normalmente. ✅
+2. Transição **sem** linha em `order_status_transitions` (tentar voltar
+   de Aceito para Novo) → bloqueada por
+   `validate_order_status_transition()` com *"transition from ... to ...
+   is not allowed for this tenant"*. ✅
+3. Atualização de `order_item_stations.status` para `done` → aceita
+   normalmente (simulando o operador da Cozinha marcando o item pronto).
+   ✅
+
+### Comportamental via HTTP real — Tarefa 06 (pendente de confirmação)
+
+`scripts/test-production-status.browser.js` repete os cenários acima via
+HTTP real — inclui criar um pedido sem informar status, tentar pular uma
+etapa do fluxo (bloqueado) e marcar um item como concluído numa estação.
+Rodar do mesmo jeito de sempre, lembrando de atualizar o cache de schema
+da Data API antes.
 
 ### Comportamental — Tarefa 05 (simulado via SQL, `klikflow_owner`)
 

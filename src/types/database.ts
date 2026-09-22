@@ -42,11 +42,21 @@ export type PermissionKey =
   | "production_stations.manage"
   | "consumption_locations.manage"
   | "tabs.manage"
-  | "orders.manage";
+  | "orders.manage"
+  | "orders.configure_statuses"
+  | "production.manage";
 
 export type CatalogStatus = "active" | "archived";
 export type TabStatus = "open" | "closed";
-export type OrderStatus =
+
+/**
+ * A pedido's status is no longer a fixed enum (Task 06) — `orders`
+ * references `order_statuses.id`, a list configurable per tenant. This
+ * union is only the set of `key`s `create_tenant()` seeds by default;
+ * any tenant may reconfigure its own flow via `orders.configure_statuses`
+ * and end up with different keys.
+ */
+export type DefaultOrderStatusKey =
   | "new"
   | "accepted"
   | "in_production"
@@ -54,6 +64,8 @@ export type OrderStatus =
   | "delivered"
   | "completed"
   | "cancelled";
+
+export type OrderItemStationStatus = "pending" | "in_progress" | "done";
 
 export interface Database {
   public: {
@@ -464,21 +476,27 @@ export interface Database {
           id: string;
           tenant_id: string;
           tab_id: string;
-          status: OrderStatus;
+          status_id: string;
           created_by: string;
           created_at: string;
           updated_at: string;
         };
+        // status_id may be omitted: set_default_order_status() fills in
+        // the tenant's lowest-`sequence` order_statuses row when absent.
         Insert: {
           id?: string;
           tenant_id: string;
           tab_id: string;
+          status_id?: string;
           created_by: string;
           created_at?: string;
           updated_at?: string;
         };
+        // A status_id change is only accepted when
+        // order_status_transitions has a matching row for this tenant —
+        // an update to any other status_id is rejected by the database.
         Update: {
-          status?: OrderStatus;
+          status_id?: string;
           updated_at?: string;
         };
         Relationships: [
@@ -532,6 +550,106 @@ export interface Database {
             foreignKeyName: "order_items_product_id_fkey";
             columns: ["product_id"];
             referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      order_statuses: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          key: string;
+          label: string;
+          sequence: number;
+          is_terminal: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          key: string;
+          label: string;
+          sequence: number;
+          is_terminal?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          key?: string;
+          label?: string;
+          sequence?: number;
+          is_terminal?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "order_statuses_tenant_id_fkey";
+            columns: ["tenant_id"];
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      order_status_transitions: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          from_status_id: string;
+          to_status_id: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          from_status_id: string;
+          to_status_id: string;
+        };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "order_status_transitions_from_status_id_fkey";
+            columns: ["from_status_id"];
+            referencedRelation: "order_statuses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "order_status_transitions_to_status_id_fkey";
+            columns: ["to_status_id"];
+            referencedRelation: "order_statuses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      order_item_stations: {
+        Row: {
+          id: string;
+          order_item_id: string;
+          station_id: string;
+          sequence: number;
+          status: OrderItemStationStatus;
+          started_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+        };
+        // No Insert: rows are only created by seed_order_item_stations()
+        // when an order_item is inserted, never directly by the client.
+        Insert: never;
+        Update: {
+          status?: OrderItemStationStatus;
+          started_at?: string | null;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "order_item_stations_order_item_id_fkey";
+            columns: ["order_item_id"];
+            referencedRelation: "order_items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "order_item_stations_station_id_fkey";
+            columns: ["station_id"];
+            referencedRelation: "production_stations";
             referencedColumns: ["id"];
           },
         ];

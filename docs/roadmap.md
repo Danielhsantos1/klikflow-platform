@@ -128,14 +128,56 @@ do Supabase). O resultado final está no Neon.
 - **Pendente**: rodar esse script no navegador e confirmar o resultado.
 - Nenhuma UI de comanda/pedido criada — fora do escopo desta tarefa.
 
+## Concluído (Tarefa 06 — Produção + Status configurável)
+
+- `db/migrations/0009_production_status.sql` aplicada ao projeto Neon
+  real: `orders.status` (enum fixo da Tarefa 05) substituído por
+  `orders.status_id`, apontando para `order_statuses` (lista configurável
+  por tenant, com `sequence` e `is_terminal`) e `order_status_transitions`
+  (grafo explícito de transições permitidas).
+- 2 novas permissões (`orders.configure_statuses`, `production.manage`).
+- `default_order_status()` (trigger BEFORE INSERT em `orders`): se o
+  cliente não informa `status_id`, usa o de menor `sequence` do tenant.
+- `validate_order_status_transition()` (trigger BEFORE UPDATE em
+  `orders`): só aceita a mudança de `status_id` se existir uma linha
+  correspondente em `order_status_transitions` — transições fora do grafo
+  são bloqueadas com exceção.
+- `create_tenant()` atualizado: semeia o fluxo padrão de 7 status (Novo →
+  Aceito → Em Produção → Pronto → Entregue → Finalizado, mais Cancelado a
+  partir de qualquer status não-terminal) e as transições lineares
+  correspondentes para todo tenant novo.
+- `order_item_stations` (novo): acompanha cada item do pedido nas
+  Estações de Produção do produto (Tarefa 04); semeado automaticamente
+  via trigger `seed_order_item_stations()` quando o item é criado — sem
+  política de INSERT/DELETE client-side, as linhas só nascem/morrem pela
+  trigger.
+- **Validado via SQL contra o Neon real** (réplica manual da lógica de
+  `create_tenant()`, já que `auth.uid()` não pode ser simulado por SQL
+  direto): pedido sem `status_id` recebeu o status "Novo" por padrão;
+  transição válida (Novo → Aceito) aceita; transição pulando etapas
+  (Aceito → Finalizado) corretamente bloqueada; item de produção marcado
+  como `done` com sucesso. Dados de teste limpos depois.
+- `src/types/database.ts` (`order_statuses`, `order_status_transitions`,
+  `order_item_stations`, `orders.status_id`) e `src/types/order.ts`
+  (tipos de domínio) atualizados.
+- `scripts/test-production-status.browser.js` criado, cobrindo os mesmos
+  cenários via HTTP real (Neon Auth + Data API).
+- **Pendente**: rodar esse script no navegador e confirmar o resultado
+  (usuário está sem acesso a computador no momento; validação SQL já
+  confirma o comportamento das triggers).
+- Realtime (citado no título da tarefa mestra) fica para quando existir
+  uma tela consumindo esses eventos (Tarefa 07+) — construir a infra
+  agora, sem consumidor, seria trabalho especulativo.
+- Nenhuma UI de produção/status criada — fora do escopo desta tarefa.
+
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar a validação via HTTP da Tarefa 05 contra o Neon real.
-2. Tarefa 06 — Produção, status configurável (máquina de transições por
-   tenant, não mais um enum fixo), Realtime.
-3. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
-   — inclui a primeira UI real de catálogo, comandas/pedidos e gestão de
-   usuários/perfis.
+1. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
+   Neon real, quando o usuário estiver num computador.
+2. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
+   — inclui a primeira UI real de catálogo, comandas/pedidos, produção e
+   gestão de usuários/perfis.
+3. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
 4. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
