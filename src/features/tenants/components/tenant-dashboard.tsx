@@ -104,36 +104,33 @@ export function TenantDashboard() {
     );
   }
 
+  const tabs: { key: View; label: string }[] = [
+    { key: "operations", label: "Comandas" },
+    { key: "production", label: "Produção" },
+    { key: "catalog", label: "Catálogo" },
+    { key: "team", label: "Equipe" },
+  ];
+
   return (
     <div className="flex flex-1 flex-col items-center">
-      <div className="flex w-full max-w-2xl flex-wrap items-center justify-between gap-2 px-6 pt-6">
-        <div className="flex flex-wrap gap-2">
-          <button
-            className={cn(buttonVariants({ variant: view === "operations" ? "default" : "outline", size: "sm" }))}
-            onClick={() => setView("operations")}
-          >
-            Comandas
-          </button>
-          <button
-            className={cn(buttonVariants({ variant: view === "production" ? "default" : "outline", size: "sm" }))}
-            onClick={() => setView("production")}
-          >
-            Produção
-          </button>
-          <button
-            className={cn(buttonVariants({ variant: view === "catalog" ? "default" : "outline", size: "sm" }))}
-            onClick={() => setView("catalog")}
-          >
-            Catálogo
-          </button>
-          <button
-            className={cn(buttonVariants({ variant: view === "team" ? "default" : "outline", size: "sm" }))}
-            onClick={() => setView("team")}
-          >
-            Equipe
-          </button>
+      <div className="bg-background/95 sticky top-0 z-10 flex w-full max-w-2xl flex-col gap-2 border-b border-neutral-200 px-4 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:border-none sm:bg-transparent sm:px-6 sm:pt-6">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              className={cn(
+                "shrink-0 whitespace-nowrap",
+                buttonVariants({ variant: view === tab.key ? "default" : "outline", size: "sm" }),
+              )}
+              onClick={() => setView(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-        <SignOutButton />
+        <div className="flex justify-end">
+          <SignOutButton />
+        </div>
       </div>
       {view === "operations" && <OperationsBoard tenantId={tenant.id} />}
       {view === "production" && <ProductionBoard />}
