@@ -8,22 +8,41 @@ import type { Role } from "@/lib/permissions/types";
 import type { Membership } from "@/types/tenant";
 
 type MembershipWithRelations = Membership & {
-  profiles: { full_name: string | null } | null;
+  full_name: string | null;
   roles: { name: string } | null;
 };
 
+// `memberships.user_id` references `neon_auth."user"`, not
+// `public.profiles` — they only share the same UUID by convention
+// (`handle_new_user()`), there's no real foreign key for the Data API
+// to embed. `profiles(full_name)` has to be a separate query, joined
+// here in JS, not a nested select.
 async function fetchMembers(tenantId: string) {
   const db = createDbClient();
   const [membershipsRes, rolesRes] = await Promise.all([
     db
       .from("memberships")
-      .select("*, profiles(full_name), roles(name)")
+      .select("*, roles(name)")
       .eq("tenant_id", tenantId)
       .order("created_at"),
     db.from("roles").select("*").eq("tenant_id", tenantId).order("name"),
   ]);
 
-  return { membershipsRes, rolesRes };
+  if (membershipsRes.error || !membershipsRes.data) {
+    return { membershipsRes, rolesRes, profilesByUserId: new Map<string, string | null>() };
+  }
+
+  const userIds = membershipsRes.data.map((membership) => membership.user_id);
+  const profilesRes =
+    userIds.length > 0
+      ? await db.from("profiles").select("id, full_name").in("id", userIds)
+      : { data: [], error: null };
+
+  const profilesByUserId = new Map(
+    (profilesRes.data ?? []).map((profile) => [profile.id, profile.full_name]),
+  );
+
+  return { membershipsRes, rolesRes, profilesByUserId };
 }
 
 export function MembersManager({ tenantId }: { tenantId: string }) {
@@ -32,28 +51,39 @@ export function MembersManager({ tenantId }: { tenantId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function reload() {
-    const { membershipsRes, rolesRes } = await fetchMembers(tenantId);
-
-    if (membershipsRes.error) setError(membershipsRes.error.message);
-    else setMemberships((membershipsRes.data as unknown as MembershipWithRelations[]) ?? []);
+  function applyResult({
+    membershipsRes,
+    rolesRes,
+    profilesByUserId,
+  }: Awaited<ReturnType<typeof fetchMembers>>) {
+    if (membershipsRes.error) {
+      setError(membershipsRes.error.message);
+    } else {
+      const raw = membershipsRes.data as unknown as (Membership & {
+        roles: { name: string } | null;
+      })[];
+      setMemberships(
+        raw.map((membership) => ({
+          ...membership,
+          full_name: profilesByUserId.get(membership.user_id) ?? null,
+        })),
+      );
+    }
 
     if (rolesRes.error) setError(rolesRes.error.message);
     else setRoles(rolesRes.data ?? []);
   }
 
+  async function reload() {
+    applyResult(await fetchMembers(tenantId));
+  }
+
   useEffect(() => {
     let cancelled = false;
 
-    fetchMembers(tenantId).then(({ membershipsRes, rolesRes }) => {
+    fetchMembers(tenantId).then((result) => {
       if (cancelled) return;
-
-      if (membershipsRes.error) setError(membershipsRes.error.message);
-      else setMemberships((membershipsRes.data as unknown as MembershipWithRelations[]) ?? []);
-
-      if (rolesRes.error) setError(rolesRes.error.message);
-      else setRoles(rolesRes.data ?? []);
-
+      applyResult(result);
       setLoading(false);
     });
 
@@ -110,7 +140,7 @@ export function MembersManager({ tenantId }: { tenantId: string }) {
             className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <div className="flex flex-col">
-              <span>{membership.profiles?.full_name ?? "Membro sem nome"}</span>
+              <span>{membership.full_name ?? "Membro sem nome"}</span>
               <span className="text-xs text-neutral-400">
                 {membership.status === "active" ? "Ativo" : "Suspenso"}
               </span>

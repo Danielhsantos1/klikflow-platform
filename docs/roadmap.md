@@ -339,11 +339,22 @@ pra `/api/session-token`.
   membros da empresa (nome via a nova policy, Perfil atual, status),
   com select pra trocar de Perfil e botão pra suspender/ativar.
 - Nova aba "Equipe" no `TenantDashboard`.
+- **Bug pego em produção e corrigido no mesmo commit**: `memberships`
+  se relaciona com `profiles` só "por convenção" (mesmo UUID via
+  `handle_new_user()`), não por uma foreign key de verdade —
+  `memberships.user_id` referencia `neon_auth."user"`, não
+  `public.profiles`. Um `.select("*, profiles(full_name), roles(name)")`
+  (nested select assumindo uma FK que não existe) falhou com
+  `"Could not find a relationship between 'memberships' and 'profiles'"`.
+  Corrigido: `profiles` agora é buscado numa query separada
+  (`profiles?id=in.(...)`) e o nome é juntado em JS pelo `user_id` — a
+  Data API só faz embed automático a partir de uma FK real.
 - **Testado**: `npm run build`/`npm run lint` sem erros; `/app` sem
   sessão continua redirecionando; a nova policy foi confirmada
-  aplicada (`pg_policies`). Fluxo completo (criar Perfil, dar
-  permissão, trocar Perfil de um membro) depende do Neon real e fica
-  para o usuário confirmar em produção.
+  aplicada (`pg_policies`); a tela de Membros confirmada em produção
+  mostrando o próprio usuário logado corretamente. Fluxo completo
+  (criar Perfil, dar permissão, trocar Perfil de um membro) fica para
+  quando houver mais de um membro pra testar.
 - Fora do escopo, documentado explicitamente na própria tela: convidar
   um novo usuário por e-mail. Isso exige um fluxo de convite (token,
   e-mail, aceite) que não existe ainda — bem maior que "mostrar e
