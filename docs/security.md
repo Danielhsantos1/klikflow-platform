@@ -78,6 +78,13 @@
   guard usa `getCurrentUser()` num Server Component e redireciona antes
   de qualquer HTML sensível ser enviado — não é uma checagem client-side
   que poderia ser contornada desabilitando JS.
+- **Catálogo por empresa é RLS, não filtro de UI (Tarefa 08)**: o
+  `CatalogManager` não recebe uma lista de "tenants permitidos" nem
+  decide o que mostrar — ele só sabe o `tenant_id` da empresa do usuário
+  logado (resolvido via `memberships`) e delega toda a checagem de
+  isolamento e de permissão (`catalog.manage`) para as policies já
+  testadas na Tarefa 04. Um usuário sem permissão de escrita recebe o
+  erro de RLS na hora de inserir, não uma tela que finge que ele pode.
 
 ## O que ainda não existe (intencionalmente)
 

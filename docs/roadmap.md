@@ -200,15 +200,45 @@ do Supabase). O resultado final está no Neon.
 - Nenhuma tela de negócio (catálogo, comanda, produção) criada ainda —
   essa é a próxima tarefa.
 
+## Concluído (Tarefa 08 — Cadastro da empresa + Catálogo, primeira tela de negócio)
+
+- `/app` deixou de ser uma tela de boas-vindas estática e virou o
+  dashboard real: `TenantDashboard` (Client Component) descobre a
+  empresa do usuário logado consultando `memberships` via Data API
+  (respeitando RLS, sem nenhum bypass) e decide o que mostrar.
+- Sem empresa ainda → `CreateTenantForm`
+  (`src/features/tenants/components/`): nome + segmento, chama a RPC
+  `create_tenant()` (Tarefa 02) direto do navegador — a mesma função já
+  testada e validada, agora com UI de verdade em vez de scripts de
+  Console.
+- Com empresa → `CatalogManager`
+  (`src/features/catalog/components/`): lista e cria Categorias e
+  Produtos (nome + preço) da empresa logada — dados **editáveis por
+  empresa**, não uma tela genérica: cada tenant só enxerga e só escreve
+  o próprio catálogo, RLS (Tarefa 04) decide isso no banco, não a UI.
+- `src/components/ui/input.tsx` reutilizado; nenhuma tela nova de
+  design system criada além do necessário.
+- **Testado**: `npm run build` e `npm run lint` sem erros; `/app` sem
+  sessão continua redirecionando (307) para `/login`. O fluxo completo
+  (criar empresa → cadastrar categoria → cadastrar produto) depende do
+  Neon Auth real e fica para o usuário confirmar em
+  `https://klikflow.vercel.app`, pelo navegador normal — sem Console.
+- Fora do escopo: edição/exclusão de categoria e produto, upload de
+  imagem, gestão de Estações de Produção e Locais de Consumo pela UI,
+  convite de outros usuários para a empresa — tudo isso já existe no
+  banco (Tarefas 03/04) mas ainda não tem tela.
+
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
+1. Confirmar no navegador que criar empresa → cadastrar categoria →
+   cadastrar produto funciona contra o Neon real (Tarefa 08).
+2. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
    Neon real, quando o usuário estiver num computador.
-2. Telas de negócio: CUSTOMER (autoatendimento), OPERATIONS, MANAGEMENT
-   — inclui a primeira UI real de catálogo, comandas/pedidos, produção e
-   gestão de usuários/perfis.
-3. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
-4. SaaS Admin (administração da plataforma, cross-tenant).
+3. Próximas telas de negócio: comanda/pedido (OPERATIONS), produção,
+   gestão de usuários/perfis (MANAGEMENT), tela CUSTOMER de
+   autoatendimento.
+4. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
+5. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
 mesmo cuidado de não antecipar funcionalidades fora do escopo pedido.
