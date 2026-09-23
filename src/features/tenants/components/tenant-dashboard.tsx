@@ -7,12 +7,13 @@ import { createDbClient } from "@/lib/db/client";
 import { CreateTenantForm } from "@/features/tenants/components/create-tenant-form";
 import { CatalogManager } from "@/features/catalog/components/catalog-manager";
 import { OperationsBoard } from "@/features/tabs/components/operations-board";
+import { ProductionBoard } from "@/features/production/components/production-board";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
 type ActiveTenant = { id: string; name: string };
-type View = "operations" | "catalog";
+type View = "operations" | "production" | "catalog";
 
 const STUCK_TIMEOUT_MS = 8000;
 
@@ -112,6 +113,12 @@ export function TenantDashboard() {
             Comandas
           </button>
           <button
+            className={cn(buttonVariants({ variant: view === "production" ? "default" : "outline", size: "sm" }))}
+            onClick={() => setView("production")}
+          >
+            Produção
+          </button>
+          <button
             className={cn(buttonVariants({ variant: view === "catalog" ? "default" : "outline", size: "sm" }))}
             onClick={() => setView("catalog")}
           >
@@ -120,9 +127,9 @@ export function TenantDashboard() {
         </div>
         <SignOutButton />
       </div>
-      {view === "operations" ? (
-        <OperationsBoard tenantId={tenant.id} />
-      ) : (
+      {view === "operations" && <OperationsBoard tenantId={tenant.id} />}
+      {view === "production" && <ProductionBoard />}
+      {view === "catalog" && (
         <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
       )}
     </div>

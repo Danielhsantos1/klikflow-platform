@@ -279,24 +279,45 @@ pra `/api/session-token`.
   (Tarefa 05), a UI nunca envia preço. Botão "Fechar comanda".
 - `TenantDashboard` ganhou um seletor Comandas/Catálogo no topo, os
   dois convivendo na mesma sessão.
-- **Testado**: `npm run build`/`npm run lint` sem erros; `/app` sem
-  sessão continua redirecionando. Fluxo completo (abrir comanda →
-  novo pedido → adicionar item → fechar comanda) depende do Neon real
-  e fica para o usuário confirmar em produção.
+- **Fechado**: usuário confirmou em produção — abriu comanda num local,
+  criou pedido, adicionou item do catálogo, viu o preço certo e fechou
+  a comanda.
 - Fora do escopo: editar/cancelar item, trocar status manualmente pela
   UI (Tarefa 06 já garante que só transições configuradas passam),
-  tela de produção acompanhando `order_item_stations` — essa é a
-  próxima tela natural (OPERATIONS → cozinha).
+  histórico de comandas fechadas (perguntado ao usuário, decidiu adiar
+  para depois de produção).
+
+## Concluído (Tarefa 10 — Produção, tela da cozinha)
+
+- `ProductionBoard` (`src/features/production/components/`): fila de
+  itens pendentes/em preparo (`order_item_stations` com
+  `status in (pending, in_progress)`), agrupada por Estação de Produção
+  (Tarefa 04) — a mesma fila que a Tarefa 06 provou funcionar via SQL,
+  agora com uma tela de verdade em cima.
+- Cada item mostra produto + quantidade (via `order_items`, join
+  automático) e um botão que avança o status: `pending` → `in_progress`
+  (grava `started_at`) → `done` (grava `completed_at`, some da fila).
+  Sem opção de "voltar" o status — a máquina de produção é sempre pra
+  frente, igual o `orders.status_id` da Tarefa 06.
+  Sem UI de INSERT/DELETE: as linhas de `order_item_stations` só
+  nascem via trigger (Tarefa 06), a tela só atualiza `status`.
+- Terceira aba (Comandas/Produção/Catálogo) no `TenantDashboard`.
+- **Testado**: `npm run build`/`npm run lint` sem erros; `/app` sem
+  sessão continua redirecionando. Fluxo completo depende do Neon real
+  e fica para o usuário confirmar em produção.
+- Fora do escopo: reordenar a fila manualmente, atribuir item a um
+  funcionário específico, notificação sonora/push de novo pedido — tudo
+  isso é refinamento de UX de uma tela que já existe, não uma tarefa
+  nova do roadmap mestre.
 
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar no navegador que abrir comanda → pedido → item → fechar
-   comanda funciona contra o Neon real (Tarefa 09).
+1. Confirmar no navegador que a fila de produção avança
+   pendente → em preparo → concluído contra o Neon real (Tarefa 10).
 2. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
    Neon real, quando o usuário estiver num computador.
-3. Próximas telas de negócio: produção (cozinha vendo
-   `order_item_stations`), gestão de usuários/perfis (MANAGEMENT), tela
-   CUSTOMER de autoatendimento.
+3. Próximas telas de negócio: gestão de usuários/perfis (MANAGEMENT),
+   tela CUSTOMER de autoatendimento, histórico de comandas/relatórios.
 4. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
 5. SaaS Admin (administração da plataforma, cross-tenant).
 
