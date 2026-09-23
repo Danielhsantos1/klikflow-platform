@@ -12,10 +12,14 @@ const handler = auth.handler();
 
 /**
  * A malformed/expired session cookie (e.g. left over from a previous
- * deploy's cookie secret) must fail as a normal 401 JSON response, never
- * as an unhandled crash whose raw error text gets rendered as the whole
- * page — that's what callers like `authClient.useSession()` expect to
- * parse.
+ * deploy's cookie secret) must fail as an ordinary "no session" response,
+ * never as an unhandled crash whose raw error text gets rendered as the
+ * whole page. Responding with the same 200/`null` shape Better Auth
+ * itself uses for "not logged in" (rather than an error status) is what
+ * keeps `authClient.useSession()` resolving normally instead of getting
+ * stuck pending — a non-2xx/unexpected-shape response here is exactly
+ * the kind of thing its internal session store doesn't know how to
+ * settle from.
  */
 async function withFallback(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,10 +30,8 @@ async function withFallback(
   try {
     return await run(...args);
   } catch (error) {
-    return NextResponse.json(
-      { error: { message: error instanceof Error ? error.message : "Auth error" } },
-      { status: 401 },
-    );
+    console.error("[auth-proxy] unhandled error, treating as no session:", error);
+    return NextResponse.json(null, { status: 200 });
   }
 }
 
