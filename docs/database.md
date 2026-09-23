@@ -38,7 +38,7 @@ relacionado.
 
 ## Como aplicar as migrations
 
-As 9 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
+As 10 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
 `production`) via MCP do Neon (`run_sql_transaction`), na ordem dos
 arquivos. Para reaplicar em outro branch/projeto:
 
@@ -64,6 +64,7 @@ existe um estado intermediário exposto.
 | `0007_catalog.sql` | Tarefa 04: `categories`, `products` (com `price`/`image_url`), `production_stations` (Estação de Produção), `product_stations` (associação produto↔estação), `consumption_locations` (Local de Consumo, sob `units`). 3 novas permissões (`catalog.manage`, `production_stations.manage`, `consumption_locations.manage`) e o trigger `check_product_category_same_tenant`. |
 | `0008_tabs_orders.sql` | Tarefa 05: `tabs` (Comanda), `orders` (Pedido, status fixo por enquanto), `order_items` (itens com snapshot de nome/preço). 2 novas permissões (`tabs.manage`, `orders.manage`). Triggers: `check_tab_location_same_tenant`, `check_order_tab_same_tenant_and_open`, `snapshot_order_item` (ignora preço/nome enviados pelo cliente). |
 | `0009_production_status.sql` | Tarefa 06: `orders.status` (enum fixo) trocado por `orders.status_id` (FK para `order_statuses`, configurável por tenant); `order_status_transitions` (grafo de transições permitidas); `order_item_stations` (rastreamento de cada item nas Estações de Produção, seedado automaticamente). 2 novas permissões (`orders.configure_statuses`, `production.manage`). `create_tenant()` atualizado para semear o fluxo padrão (Novo→Aceito→Em Produção→Pronto→Entregue→Finalizado, +Cancelado). |
+| `0010_default_unit.sql` | Tarefa 09: `create_tenant()` atualizado para semear uma Unidade padrão ("Unidade Principal") — pré-requisito para criar um Local de Consumo, que a tela OPERATIONS desta tarefa precisa. Backfill para tenants já existentes. |
 
 ## Entidades
 

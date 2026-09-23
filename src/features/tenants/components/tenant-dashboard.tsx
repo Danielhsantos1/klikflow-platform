@@ -6,10 +6,13 @@ import { authClient } from "@/lib/auth/client";
 import { createDbClient } from "@/lib/db/client";
 import { CreateTenantForm } from "@/features/tenants/components/create-tenant-form";
 import { CatalogManager } from "@/features/catalog/components/catalog-manager";
+import { OperationsBoard } from "@/features/tabs/components/operations-board";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils/cn";
 
 type ActiveTenant = { id: string; name: string };
+type View = "operations" | "catalog";
 
 const STUCK_TIMEOUT_MS = 8000;
 
@@ -19,6 +22,7 @@ export function TenantDashboard() {
   const [tenant, setTenant] = useState<ActiveTenant | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stuck, setStuck] = useState(false);
+  const [view, setView] = useState<View>("operations");
 
   const userId = session.data?.user?.id;
   const isWaiting = session.isPending || (Boolean(userId) && loading);
@@ -99,10 +103,28 @@ export function TenantDashboard() {
 
   return (
     <div className="flex flex-1 flex-col items-center">
-      <div className="flex w-full max-w-2xl justify-end px-6 pt-6">
+      <div className="flex w-full max-w-2xl items-center justify-between px-6 pt-6">
+        <div className="flex gap-2">
+          <button
+            className={cn(buttonVariants({ variant: view === "operations" ? "default" : "outline", size: "sm" }))}
+            onClick={() => setView("operations")}
+          >
+            Comandas
+          </button>
+          <button
+            className={cn(buttonVariants({ variant: view === "catalog" ? "default" : "outline", size: "sm" }))}
+            onClick={() => setView("catalog")}
+          >
+            Catálogo
+          </button>
+        </div>
         <SignOutButton />
       </div>
-      <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
+      {view === "operations" ? (
+        <OperationsBoard tenantId={tenant.id} />
+      ) : (
+        <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
+      )}
     </div>
   );
 }

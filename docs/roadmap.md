@@ -258,15 +258,47 @@ Bearer na Data API. **Lição para as próximas telas**: nunca usar
 app — sempre a forma "external auth provider" com `getToken` apontando
 pra `/api/session-token`.
 
+## Concluído (Tarefa 09 — Comanda + Pedido, tela OPERATIONS)
+
+- `db/migrations/0010_default_unit.sql`: `create_tenant()` passa a
+  semear uma Unidade padrão ("Unidade Principal") — nenhum Local de
+  Consumo pode existir sem uma Unidade, e nenhuma tarefa anterior
+  criava uma automaticamente. Inclui backfill para tenants já
+  existentes (o "Cafe Daniel" da Tarefa 08 recebeu sua Unidade).
+- `OperationsBoard` (`src/features/tabs/components/`): lista os Locais
+  de Consumo da empresa (com formulário pra criar novos, ex: "Mesa 1"),
+  e por local mostra "Abrir comanda" (sem comanda aberta) ou
+  "Ver comanda" (com uma aberta, respeitando a restrição de só uma
+  comanda `open` por local da Tarefa 05).
+- `TabPanel`: dentro de uma comanda aberta, lista os Pedidos (com o
+  status configurável da Tarefa 06 já resolvido pelo nome, não por um
+  id cru), cada um com seus itens e preço; botão "Novo pedido"
+  (nasce com o status inicial via trigger, sem UI escolher) e, por
+  pedido, um formulário pra adicionar item (produto + quantidade) —
+  nome/preço do item são sempre o snapshot gravado pelo banco
+  (Tarefa 05), a UI nunca envia preço. Botão "Fechar comanda".
+- `TenantDashboard` ganhou um seletor Comandas/Catálogo no topo, os
+  dois convivendo na mesma sessão.
+- **Testado**: `npm run build`/`npm run lint` sem erros; `/app` sem
+  sessão continua redirecionando. Fluxo completo (abrir comanda →
+  novo pedido → adicionar item → fechar comanda) depende do Neon real
+  e fica para o usuário confirmar em produção.
+- Fora do escopo: editar/cancelar item, trocar status manualmente pela
+  UI (Tarefa 06 já garante que só transições configuradas passam),
+  tela de produção acompanhando `order_item_stations` — essa é a
+  próxima tela natural (OPERATIONS → cozinha).
+
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
+1. Confirmar no navegador que abrir comanda → pedido → item → fechar
+   comanda funciona contra o Neon real (Tarefa 09).
+2. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
    Neon real, quando o usuário estiver num computador.
-2. Próximas telas de negócio: comanda/pedido (OPERATIONS), produção,
-   gestão de usuários/perfis (MANAGEMENT), tela CUSTOMER de
-   autoatendimento.
-3. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
-4. SaaS Admin (administração da plataforma, cross-tenant).
+3. Próximas telas de negócio: produção (cozinha vendo
+   `order_item_stations`), gestão de usuários/perfis (MANAGEMENT), tela
+   CUSTOMER de autoatendimento.
+4. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
+5. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
 mesmo cuidado de não antecipar funcionalidades fora do escopo pedido.
