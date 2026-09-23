@@ -302,9 +302,16 @@ pra `/api/session-token`.
   Sem UI de INSERT/DELETE: as linhas de `order_item_stations` só
   nascem via trigger (Tarefa 06), a tela só atualiza `status`.
 - Terceira aba (Comandas/Produção/Catálogo) no `TenantDashboard`.
-- **Testado**: `npm run build`/`npm run lint` sem erros; `/app` sem
-  sessão continua redirecionando. Fluxo completo depende do Neon real
-  e fica para o usuário confirmar em produção.
+- **Fechado**: usuário confirmou em produção — item "Parmegiana de
+  frango" apareceu agrupado na estação "Cozinha", avançou
+  pendente → em preparo → concluído e saiu da fila.
+- Achado durante o teste: nenhuma tela criava `production_stations` nem
+  `product_stations`, então todo produto cadastrado pela UI nunca
+  entrava na fila (o trigger `seed_order_item_stations()` só semeia a
+  partir de um vínculo já existente). Corrigido no mesmo commit:
+  `CatalogManager` ganhou "Estações de produção" (listar/criar) e um
+  vínculo produto↔estação — sem isso, todo tenant novo precisaria de
+  mim inserindo direto no banco pra usar a tela de Produção.
 - Fora do escopo: reordenar a fila manualmente, atribuir item a um
   funcionário específico, notificação sonora/push de novo pedido — tudo
   isso é refinamento de UX de uma tela que já existe, não uma tarefa
