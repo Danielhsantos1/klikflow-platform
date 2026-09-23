@@ -6,16 +6,21 @@ import { auth } from "@/lib/auth/server";
  * session, so `src/lib/db/client.ts` can attach it as the Data API's
  * Authorization header.
  *
- * Reading it server-side (the same `auth.getSession()` call
- * `getCurrentUser()` already uses successfully) sidesteps two dead ends:
- * the beta SDK's `getJWTToken()` runtime method (404s on its own URL
- * re-derivation) and reading `set-auth-jwt` off our `/api/auth/*` proxy
- * response (Next's route handler doesn't forward that header through).
+ * `auth.getSession()`'s `session.token` is Better Auth's own opaque
+ * session token, not a JWT — sending that to the Data API is exactly
+ * what produced "not a valid JWT encoding". The actual JWT comes from
+ * Better Auth's JWT plugin endpoint (`/token`), which mints one from the
+ * current session; we call it server-side (via the same underlying
+ * handler `/api/auth/[...path]` exposes) so it reads the httpOnly cookie
+ * directly, no header-forwarding required.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data } = await auth.getSession();
-    return NextResponse.json({ token: data?.session?.token ?? null });
+    const response = await auth.handler().GET(request, {
+      params: Promise.resolve({ path: ["token"] }),
+    });
+    const body = (await response.json().catch(() => null)) as { token?: string } | null;
+    return NextResponse.json({ token: body?.token ?? null });
   } catch {
     return NextResponse.json({ token: null });
   }
