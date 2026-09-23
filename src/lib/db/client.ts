@@ -13,15 +13,24 @@ import type { Database } from "@/types/database";
  * A first fix tried this beta SDK's internal `getJWTToken()` runtime
  * method, which itself failed with an unrelated `AuthApiError: HTTP 404`
  * — a separate bug in how that beta method re-derives the auth base URL
- * internally. Sidestepping both: fetch the session directly from our own
- * proxy and read the JWT off the `set-auth-jwt` response header, exactly
- * the mechanism `scripts/test-*.browser.js` have relied on since Task 02
- * and that's been proven to work end-to-end against the real Neon Auth.
+ * internally. A second attempt read `set-auth-jwt` off our own
+ * `/api/auth/get-session` proxy — but our Next.js route handler doesn't
+ * forward that response header through, so the token came back empty. A
+ * third attempt fetched the real Neon Auth host directly (cross-origin,
+ * the way `scripts/test-*.browser.js` do) — but that only works for
+ * those scripts because they sign in directly against that host too; our
+ * app signs in through the same-origin `/api/auth` proxy, so the session
+ * cookie only ever exists on `klikflow.vercel.app`, never on Neon's host.
+ *
+ * Fix: `src/app/api/session-token/route.ts`, a route of our own that
+ * reads the session server-side (the same `auth.getSession()` call
+ * `getCurrentUser()` already uses successfully) and hands back its JWT.
  */
 async function getJwtFromSession(): Promise<string | null> {
-  const response = await fetch("/api/auth/get-session", { credentials: "include" });
+  const response = await fetch("/api/session-token", { credentials: "include" });
   if (!response.ok) return null;
-  return response.headers.get("set-auth-jwt");
+  const { token } = (await response.json()) as { token: string | null };
+  return token;
 }
 
 export function createDbClient() {
