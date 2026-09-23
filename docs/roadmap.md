@@ -387,9 +387,33 @@ tarefas sequenciais.
   `src/types/database.ts`/`src/types/order.ts` atualizados
   (`OrderChannel`). Nenhuma RPC, policy nova ou UI ainda — só schema,
   como planejado.
-- **Próximo**: Tarefa 3/N — RPCs seguras do cliente
-  (`open_customer_tab`, validação de `access_token`), testadas via SQL
-  antes de qualquer tela.
+- **Concluído (Tarefa 3/N — RPCs seguras do cliente)**:
+  `db/migrations/0013_customer_channel_rpcs.sql` — `orders.created_by`
+  virou nullable (mesmo motivo do `opened_by` da Tarefa 2/N); 4 funções
+  `SECURITY DEFINER` concedidas ao role `anonymous`:
+  `open_customer_tab` (abre a Comanda e devolve o `access_token`),
+  `get_customer_tab` (retoma a sessão a partir do token),
+  `create_customer_order` e `add_customer_order_item`. Nenhuma policy
+  de RLS nova para `anonymous` — toda escrita do cliente passa por
+  essas RPCs, que resolvem a Comanda pelo token e nunca confiam em
+  `tab_id`/`tenant_id`/`order_id` informado diretamente.
+- **Testado via SQL contra o Neon real, cenário completo**: abriu uma
+  Comanda `qr_code` pro local "Mesa 1" (Cafe Daniel) e recebeu um
+  token; uma segunda tentativa no mesmo local foi bloqueada ("this
+  location already has an open tab" — a mesma restrição de uma
+  Comanda aberta por local da Tarefa 05, sem nenhum código novo pra
+  isso); `get_customer_tab` recuperou a Comanda pelo token, e um token
+  inventado foi rejeitado; criou um Pedido (o trigger de status padrão
+  da Tarefa 06 funcionou normalmente com `created_by` nulo);
+  adicionou um item real ("Coca Cola", snapshot de preço certo);
+  tentou adicionar um produto de OUTRO tenant (rejeitado: "product not
+  found or inactive for this tenant") e um item num pedido inexistente
+  pra aquela Comanda (rejeitado: "order not found for this tab"). Dados
+  de teste limpos depois, local "Mesa 1" livre de novo.
+- **Próximo**: Tarefa 4/N — decisão de leitura pública do cardápio
+  (policy de RLS pra `anonymous` em `categories`/`products`, só
+  `status = 'active'`) e a primeira tela do cliente
+  (`/pedir/[locationSlug]` ou equivalente).
 
 ## Próximos passos (fora do escopo desta tarefa)
 

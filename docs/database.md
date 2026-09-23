@@ -38,7 +38,7 @@ relacionado.
 
 ## Como aplicar as migrations
 
-As 12 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
+As 13 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
 `production`) via MCP do Neon (`run_sql_transaction`), na ordem dos
 arquivos. Para reaplicar em outro branch/projeto:
 
@@ -67,6 +67,7 @@ existe um estado intermediário exposto.
 | `0010_default_unit.sql` | Tarefa 09: `create_tenant()` atualizado para semear uma Unidade padrão ("Unidade Principal") — pré-requisito para criar um Local de Consumo, que a tela OPERATIONS desta tarefa precisa. Backfill para tenants já existentes. |
 | `0011_profiles_tenant_visibility.sql` | Tarefa 11: nova policy `profiles_select_tenant_member` — libera a leitura do perfil (nome) de quem divide uma empresa com o usuário, além do próprio (`profiles_select_own` continua intocada). Necessário para a tela de Membros mostrar nomes. |
 | `0012_order_channels.sql` | Canais de Atendimento (Tarefa 2/N — só schema): `tabs.channel` (`staff`/`qr_code`/`totem`, default `staff`) e `tabs.access_token` (identifica uma Comanda de cliente sem conta), com `tabs_channel_access_token_check` garantindo que só um canal ≠ `staff` tenha token. `tabs.opened_by` vira nullable — uma Comanda de cliente não tem funcionário que a abriu. Nenhuma RPC ou policy nova ainda; comportamento de `staff` inalterado (confirmado: tabs existentes ganharam `channel = 'staff'` sem nenhuma mudança visível). |
+| `0013_customer_channel_rpcs.sql` | Canais de Atendimento (Tarefa 3/N): `orders.created_by` vira nullable (mesmo motivo do `opened_by`). 4 funções `SECURITY DEFINER`, concedidas ao role `anonymous` da Data API — `open_customer_tab`, `get_customer_tab`, `create_customer_order`, `add_customer_order_item`. Cada uma valida o `access_token` contra o banco antes de tocar em qualquer linha; nenhuma confia em `tenant_id`/`tab_id`/`order_id` vindo do cliente sem essa prova. Sem policy de RLS nova para `anonymous` — toda escrita do cliente passa por estas RPCs, nunca por INSERT direto. |
 
 ## Entidades
 

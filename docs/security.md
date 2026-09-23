@@ -105,8 +105,19 @@
   permissão nenhuma no cliente: `roles.manage`/`memberships.manage`
   decidem no banco quem pode escrever, a UI só mostra o erro de RLS se
   a escrita for negada.
-
-## O que ainda não existe (intencionalmente)
+- **Cliente sem conta nunca ganha uma policy de RLS genérica — só RPCs
+  que validam um `access_token` (Canais de Atendimento, Tarefa 3/N)**:
+  `open_customer_tab`, `get_customer_tab`, `create_customer_order` e
+  `add_customer_order_item` são `SECURITY DEFINER`, concedidas ao role
+  `anonymous`, e cada uma resolve a Comanda a partir do
+  `tabs.access_token` — nunca de um `tab_id`/`tenant_id` que o cliente
+  informe diretamente. `add_customer_order_item` também confirma que o
+  `order_id` pertence à MESMA Comanda do token e que o `product_id`
+  pertence ao mesmo tenant e está `active`, antes de inserir. Testado
+  contra o Neon real: um token errado, um pedido de outra Comanda e um
+  produto de outro tenant foram todos rejeitados. `tabs`/`orders`
+  continuam sem nenhuma policy de INSERT/UPDATE para `anonymous` — a
+  única porta de escrita do cliente são essas 4 funções.
 
 - ~~Fluxo de autenticação completo (login/signup)~~ — **fechado na
   Tarefa 07**: UI real (`/login`, `/signup`, `/app`) sobre a
