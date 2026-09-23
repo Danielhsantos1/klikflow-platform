@@ -317,15 +317,47 @@ pra `/api/session-token`.
   isso é refinamento de UX de uma tela que já existe, não uma tarefa
   nova do roadmap mestre.
 
+## Concluído (Tarefa 11 — Gestão de usuários/perfis, tela MANAGEMENT)
+
+- `db/migrations/0011_profiles_tenant_visibility.sql`: nova policy
+  `profiles_select_tenant_member` — um usuário passa a poder ler o
+  perfil (nome) de quem divide uma empresa com ele, além do próprio
+  (`profiles_select_own`, intocada). RLS combina policies do mesmo
+  comando com OR, então isso é estritamente uma liberação a mais, nunca
+  uma substituição: continua impossível ver o perfil de alguém sem
+  membership em comum. Sem essa policy, a tela de Membros desta tarefa
+  não conseguiria mostrar nome nenhum além do do próprio usuário
+  logado — achado ao desenhar a tela, corrigido antes de escrever a UI.
+- `RolesManager` (`src/features/roles/components/`): lista os Perfis
+  da empresa (com o "Proprietário" marcado como padrão), cria novos
+  Perfis, e por Perfil um checklist com todas as permissões do catálogo
+  fixo — marca/desmarca grava direto em `role_permissions`. As duas
+  proteções da Tarefa 03 (`protect_system_role`,
+  `protect_last_owner_membership`) continuam decidindo no banco o que é
+  bloqueado, a UI não replica essa lógica.
+- `MembersManager` (`src/features/members/components/`): lista os
+  membros da empresa (nome via a nova policy, Perfil atual, status),
+  com select pra trocar de Perfil e botão pra suspender/ativar.
+- Nova aba "Equipe" no `TenantDashboard`.
+- **Testado**: `npm run build`/`npm run lint` sem erros; `/app` sem
+  sessão continua redirecionando; a nova policy foi confirmada
+  aplicada (`pg_policies`). Fluxo completo (criar Perfil, dar
+  permissão, trocar Perfil de um membro) depende do Neon real e fica
+  para o usuário confirmar em produção.
+- Fora do escopo, documentado explicitamente na própria tela: convidar
+  um novo usuário por e-mail. Isso exige um fluxo de convite (token,
+  e-mail, aceite) que não existe ainda — bem maior que "mostrar e
+  editar o que já existe", que era o objetivo desta tarefa.
+
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar no navegador que a fila de produção avança
-   pendente → em preparo → concluído contra o Neon real (Tarefa 10).
+1. Confirmar no navegador que criar Perfil, dar permissão e trocar o
+   Perfil de um membro funciona contra o Neon real (Tarefa 11).
 2. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
    Neon real, quando o usuário estiver num computador.
-3. Próximas telas de negócio: gestão de usuários/perfis (MANAGEMENT),
-   tela CUSTOMER de autoatendimento, histórico de comandas/relatórios.
-4. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
+3. Próximas telas: convite de novo usuário por e-mail, tela CUSTOMER
+   de autoatendimento, histórico de comandas/relatórios.
+4. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT.
 5. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o

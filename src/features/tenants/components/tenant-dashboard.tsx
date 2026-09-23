@@ -8,12 +8,14 @@ import { CreateTenantForm } from "@/features/tenants/components/create-tenant-fo
 import { CatalogManager } from "@/features/catalog/components/catalog-manager";
 import { OperationsBoard } from "@/features/tabs/components/operations-board";
 import { ProductionBoard } from "@/features/production/components/production-board";
+import { RolesManager } from "@/features/roles/components/roles-manager";
+import { MembersManager } from "@/features/members/components/members-manager";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
 type ActiveTenant = { id: string; name: string };
-type View = "operations" | "production" | "catalog";
+type View = "operations" | "production" | "catalog" | "team";
 
 const STUCK_TIMEOUT_MS = 8000;
 
@@ -104,8 +106,8 @@ export function TenantDashboard() {
 
   return (
     <div className="flex flex-1 flex-col items-center">
-      <div className="flex w-full max-w-2xl items-center justify-between px-6 pt-6">
-        <div className="flex gap-2">
+      <div className="flex w-full max-w-2xl flex-wrap items-center justify-between gap-2 px-6 pt-6">
+        <div className="flex flex-wrap gap-2">
           <button
             className={cn(buttonVariants({ variant: view === "operations" ? "default" : "outline", size: "sm" }))}
             onClick={() => setView("operations")}
@@ -124,6 +126,12 @@ export function TenantDashboard() {
           >
             Catálogo
           </button>
+          <button
+            className={cn(buttonVariants({ variant: view === "team" ? "default" : "outline", size: "sm" }))}
+            onClick={() => setView("team")}
+          >
+            Equipe
+          </button>
         </div>
         <SignOutButton />
       </div>
@@ -131,6 +139,12 @@ export function TenantDashboard() {
       {view === "production" && <ProductionBoard />}
       {view === "catalog" && (
         <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
+      )}
+      {view === "team" && (
+        <div className="flex w-full max-w-2xl flex-col gap-8 px-6 py-10">
+          <RolesManager tenantId={tenant.id} />
+          <MembersManager tenantId={tenant.id} />
+        </div>
       )}
     </div>
   );

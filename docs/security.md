@@ -95,6 +95,16 @@
   (que lê a sessão no servidor, via `auth.handler()` no endpoint `/token`
   do plugin `jwt`) — nunca o `session.token` de `getSession()`, que é o
   token de sessão opaco do Better Auth, não um JWT.
+- **`profiles` é visível para o próprio usuário e para quem divide uma
+  empresa com ele, nunca além disso (Tarefa 11)**: a policy nova
+  (`profiles_select_tenant_member`) exige uma membership ativa
+  compartilhada nos dois lados (`m1.user_id = auth.uid()` e
+  `m2.user_id = profiles.id`, mesmo `tenant_id`) — um usuário sem
+  nenhuma empresa em comum continua sem conseguir ler o perfil de
+  ninguém. `RolesManager`/`MembersManager` não replicam checagem de
+  permissão nenhuma no cliente: `roles.manage`/`memberships.manage`
+  decidem no banco quem pode escrever, a UI só mostra o erro de RLS se
+  a escrita for negada.
 
 ## O que ainda não existe (intencionalmente)
 
