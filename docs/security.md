@@ -85,6 +85,16 @@
   isolamento e de permissão (`catalog.manage`) para as policies já
   testadas na Tarefa 04. Um usuário sem permissão de escrita recebe o
   erro de RLS na hora de inserir, não uma tela que finge que ele pode.
+- **`createDbClient()` nunca usa `createClient(url)` (forma de URL
+  única) num Client Component (Tarefa 08)**: essa forma cria seu próprio
+  cliente Neon Auth apontando direto pro host do Neon, uma sessão
+  paralela e sem cookie à que o login realmente usa (proxy same-origin
+  `/api/auth`) — foi exatamente isso que quebrou o catálogo em produção
+  logo após o deploy. `src/lib/db/client.ts` usa a forma "external auth
+  provider", buscando o JWT em `src/app/api/session-token/route.ts`
+  (que lê a sessão no servidor, via `auth.handler()` no endpoint `/token`
+  do plugin `jwt`) — nunca o `session.token` de `getSession()`, que é o
+  token de sessão opaco do Better Auth, não um JWT.
 
 ## O que ainda não existe (intencionalmente)
 

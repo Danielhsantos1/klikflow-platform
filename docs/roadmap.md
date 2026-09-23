@@ -218,27 +218,55 @@ do Supabase). O resultado final está no Neon.
   o próprio catálogo, RLS (Tarefa 04) decide isso no banco, não a UI.
 - `src/components/ui/input.tsx` reutilizado; nenhuma tela nova de
   design system criada além do necessário.
-- **Testado**: `npm run build` e `npm run lint` sem erros; `/app` sem
-  sessão continua redirecionando (307) para `/login`. O fluxo completo
-  (criar empresa → cadastrar categoria → cadastrar produto) depende do
-  Neon Auth real e fica para o usuário confirmar em
-  `https://klikflow.vercel.app`, pelo navegador normal — sem Console.
+- **Fechado**: usuário confirmou em `https://klikflow.vercel.app`
+  (navegador normal, sem Console): criou a empresa "Cafe Daniel",
+  cadastrou as categorias "Bebidas" e "Salgados", e os produtos
+  "Coca Cola" (R$ 10,00, Bebidas) e "Coxinha Frango" (R$ 7,00,
+  Salgados) — todos persistidos de verdade e exibidos de volta,
+  provando escrita e leitura reais contra o Neon via RLS.
 - Fora do escopo: edição/exclusão de categoria e produto, upload de
   imagem, gestão de Estações de Produção e Locais de Consumo pela UI,
   convite de outros usuários para a empresa — tudo isso já existe no
   banco (Tarefas 03/04) mas ainda não tem tela.
 
+### Incidente pós-deploy: `createDbClient()` não conseguia autenticar
+
+Ao testar em produção, `/app` falhou em cadeia por 4 causas diferentes,
+cada uma corrigida e documentada em `docs/database.md`/commits próprios
+— resumo:
+
+1. `getCurrentUser()` deixava uma sessão inválida derrubar a página
+   inteira em vez de tratar como "não logado".
+2. O fallback do proxy de auth respondia com um formato que
+   `authClient.useSession()` não sabia resolver, travando em
+   "Carregando..." para sempre.
+3. **Causa raiz real**: `createDbClient()` usava `createClient(url)` (a
+   forma de URL única), que cria seu **próprio** cliente Neon Auth
+   apontando direto pro host do Neon — uma sessão completamente separada
+   da que o login usa (que passa pelo proxy same-origin `/api/auth`,
+   onde o cookie realmente existe). Essa segunda sessão nunca tinha
+   login nenhum.
+4. Ao corrigir isso, ainda restava usar o campo certo: `session.token`
+   do Better Auth é um token de sessão opaco, não um JWT — o JWT de
+   verdade vem do plugin `jwt` do Better Auth, endpoint `GET /token`.
+
+Fix final: `src/app/api/session-token/route.ts`, uma rota própria que
+invoca esse endpoint no servidor (onde o cookie httpOnly é lido
+diretamente) e devolve `{ token }` pro `createDbClient()` usar como
+Bearer na Data API. **Lição para as próximas telas**: nunca usar
+`createClient(url)` (forma de URL única) num Client Component desta
+app — sempre a forma "external auth provider" com `getToken` apontando
+pra `/api/session-token`.
+
 ## Próximos passos (fora do escopo desta tarefa)
 
-1. Confirmar no navegador que criar empresa → cadastrar categoria →
-   cadastrar produto funciona contra o Neon real (Tarefa 08).
-2. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
+1. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
    Neon real, quando o usuário estiver num computador.
-3. Próximas telas de negócio: comanda/pedido (OPERATIONS), produção,
+2. Próximas telas de negócio: comanda/pedido (OPERATIONS), produção,
    gestão de usuários/perfis (MANAGEMENT), tela CUSTOMER de
    autoatendimento.
-4. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
-5. SaaS Admin (administração da plataforma, cross-tenant).
+3. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT acima.
+4. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
 mesmo cuidado de não antecipar funcionalidades fora do escopo pedido.
