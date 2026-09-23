@@ -50,6 +50,15 @@ export type CatalogStatus = "active" | "archived";
 export type TabStatus = "open" | "closed";
 
 /**
+ * How a `tabs` row was opened. `staff` is the only channel with any
+ * behavior today (Task 09's OperationsBoard) — `qr_code`/`totem` are
+ * schema-only placeholders for the "Canais de Atendimento" feature, so
+ * a future customer-facing channel is a data migration, not a
+ * structural one. See docs/roadmap.md for the phased plan.
+ */
+export type OrderChannel = "staff" | "qr_code" | "totem";
+
+/**
  * A pedido's status is no longer a fixed enum (Task 06) — `orders`
  * references `order_statuses.id`, a list configurable per tenant. This
  * union is only the set of `key`s `create_tenant()` seeds by default;
@@ -435,7 +444,17 @@ export interface Database {
           tenant_id: string;
           consumption_location_id: string;
           status: TabStatus;
-          opened_by: string;
+          // `staff` (default) is every tab opened through the current
+          // UI (Task 09); `qr_code`/`totem` are for the customer-facing
+          // channels being built on top — see docs/roadmap.md. A
+          // channel other than `staff` always carries an
+          // `access_token`, enforced by `tabs_channel_access_token_check`.
+          channel: OrderChannel;
+          access_token: string | null;
+          // Nullable since Task "Canais de Atendimento" 2/N: a
+          // customer-opened tab (qr_code/totem) has no staff
+          // `profiles.id` to record here.
+          opened_by: string | null;
           closed_by: string | null;
           opened_at: string;
           closed_at: string | null;
@@ -446,7 +465,9 @@ export interface Database {
           id?: string;
           tenant_id: string;
           consumption_location_id: string;
-          opened_by: string;
+          channel?: OrderChannel;
+          access_token?: string | null;
+          opened_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };

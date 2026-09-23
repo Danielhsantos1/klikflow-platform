@@ -1,6 +1,7 @@
 import type {
   Database,
   DefaultOrderStatusKey,
+  OrderChannel,
   OrderItemStationStatus,
   TabStatus,
 } from "@/types/database";
@@ -28,4 +29,4 @@ export type OrderStatusTransition =
 export type OrderItemStation =
   Database["public"]["Tables"]["order_item_stations"]["Row"];
 
-export type { TabStatus, DefaultOrderStatusKey, OrderItemStationStatus };
+export type { TabStatus, DefaultOrderStatusKey, OrderItemStationStatus, OrderChannel };

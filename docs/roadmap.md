@@ -360,16 +360,48 @@ pra `/api/session-token`.
   e-mail, aceite) que não existe ainda — bem maior que "mostrar e
   editar o que já existe", que era o objetivo desta tarefa.
 
+## Em andamento — Canais de Atendimento (QR Code / Totem)
+
+Nova funcionalide pedida pelo usuário: dar ao cliente final duas formas
+de fazer pedido sozinho, sem depender de um funcionário — QR Code/link e
+Totem/Tablet — reaproveitando o mesmo motor de Comanda/Pedido que o
+staff já usa (Tarefas 05/06/09/10), nunca um sistema paralelo.
+
+Antes de qualquer código: análise completa entregue e aprovada (ver
+histórico da conversa) — diagnóstico (CUSTOMER nunca foi implementado,
+era só uma caixa vazia em `docs/architecture.md`), arquitetura proposta
+(reaproveitar `consumption_locations` como "onde" um Totem/QR vive;
+`tabs.channel` pra registrar a origem; RPC `SECURITY DEFINER` +
+`access_token` pra autenticar um cliente sem conta numa Comanda
+específica, em vez de abrir RLS genérica pra `anon`), e um plano de 7
+tarefas sequenciais.
+
+- **Concluído (Tarefa 2/N — Estrutura de dados do Canal)**:
+  `db/migrations/0012_order_channels.sql` — `tabs.channel`
+  (`staff`/`qr_code`/`totem`, default `staff`) e `tabs.access_token`,
+  com constraint garantindo que só um canal de cliente tenha token;
+  `tabs.opened_by` virou nullable. Aplicado ao Neon real e **testado
+  via SQL**: tabs existentes ganharam `channel = 'staff'` sem qualquer
+  mudança de comportamento; uma tentativa de inserir `channel = 'qr_code'`
+  sem `access_token` foi corretamente bloqueada pela constraint.
+  `src/types/database.ts`/`src/types/order.ts` atualizados
+  (`OrderChannel`). Nenhuma RPC, policy nova ou UI ainda — só schema,
+  como planejado.
+- **Próximo**: Tarefa 3/N — RPCs seguras do cliente
+  (`open_customer_tab`, validação de `access_token`), testadas via SQL
+  antes de qualquer tela.
+
 ## Próximos passos (fora do escopo desta tarefa)
 
 1. Confirmar no navegador que criar Perfil, dar permissão e trocar o
    Perfil de um membro funciona contra o Neon real (Tarefa 11).
 2. Confirmar a validação via HTTP da Tarefa 05 e da Tarefa 06 contra o
    Neon real, quando o usuário estiver num computador.
-3. Próximas telas: convite de novo usuário por e-mail, tela CUSTOMER
-   de autoatendimento, histórico de comandas/relatórios.
-4. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT.
-5. SaaS Admin (administração da plataforma, cross-tenant).
+3. Continuar Canais de Atendimento (Tarefas 3-8/N, ver acima).
+4. Outras telas: convite de novo usuário por e-mail, histórico de
+   comandas/relatórios.
+5. Realtime, consumido pelas telas de OPERATIONS/MANAGEMENT.
+6. SaaS Admin (administração da plataforma, cross-tenant).
 
 Cada um desses itens deve ser tratado como uma tarefa própria, com o
 mesmo cuidado de não antecipar funcionalidades fora do escopo pedido.
