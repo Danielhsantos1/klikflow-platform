@@ -2,7 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 
-export type CartLine = { key: string; name: string; unitPrice: number; quantity: number };
+export type CartLine = {
+  key: string;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+};
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -15,6 +20,7 @@ export function CartPanel({
   onAction,
   actionDisabled,
   emptyLabel = "Nenhum item ainda.",
+  onRemove,
 }: {
   title?: string;
   lines: CartLine[];
@@ -22,6 +28,7 @@ export function CartPanel({
   onAction: () => void;
   actionDisabled?: boolean;
   emptyLabel?: string;
+  onRemove?: (lineKey: string) => void;
 }) {
   const total = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
 
@@ -35,8 +42,17 @@ export function CartPanel({
             <span>
               {line.quantity} {line.name}
             </span>
-            <span className="shrink-0 text-muted">
+            <span className="flex shrink-0 items-center gap-2 text-muted">
               {formatBRL(line.unitPrice * line.quantity)}
+              {onRemove && (
+                <button
+                  onClick={() => onRemove(line.key)}
+                  className="text-danger hover:underline"
+                  aria-label={`Remover uma unidade de ${line.name}`}
+                >
+                  −
+                </button>
+              )}
             </span>
           </li>
         ))}

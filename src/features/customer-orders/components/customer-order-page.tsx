@@ -195,6 +195,33 @@ export function CustomerOrderPage({
     ]);
   }
 
+  async function handleRemoveFromCart(lineKey: string) {
+    if (!tab?.access_token) return;
+    setError(null);
+
+    const [name, unitPriceText] = lineKey.split(":");
+    const lastMatch = [...cart]
+      .reverse()
+      .find((item) => item.name === name && String(item.unitPrice) === unitPriceText);
+
+    if (!lastMatch) return;
+
+    const { error: removeError } = await anonRpc<void>("remove_customer_order_item", {
+      p_token: tab.access_token,
+      p_item_id: lastMatch.id,
+    });
+
+    if (removeError) {
+      setError(removeError);
+      return;
+    }
+
+    setCart((current) => {
+      const index = current.map((item) => item.id).lastIndexOf(lastMatch.id);
+      return current.filter((_, i) => i !== index);
+    });
+  }
+
   if (loading) {
     return <p className="p-6 text-center text-muted">Carregando...</p>;
   }
@@ -279,6 +306,7 @@ export function CustomerOrderPage({
           actionLabel="Finalizar pedido"
           onAction={() => setFinished(true)}
           emptyLabel="Adicione itens do cardápio."
+          onRemove={handleRemoveFromCart}
         />
       </aside>
     </main>

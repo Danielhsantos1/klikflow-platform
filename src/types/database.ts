@@ -742,6 +742,10 @@ export interface Database {
         };
         Returns: Database["public"]["Tables"]["order_items"]["Row"];
       };
+      remove_customer_order_item: {
+        Args: { p_token: string; p_item_id: string };
+        Returns: void;
+      };
     };
     Enums: Record<string, never>;
   };
