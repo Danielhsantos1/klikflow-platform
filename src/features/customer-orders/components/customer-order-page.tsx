@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { anonRpc, anonSelect } from "@/lib/db/anonymous";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { CategoryPills } from "@/components/pos/category-pills";
 import { ProductCard } from "@/components/pos/product-card";
 import { CartPanel, type CartLine } from "@/components/pos/cart-panel";
@@ -39,9 +40,10 @@ function greeting() {
  * header — never `createDbClient()`, which always attaches whatever
  * staff session cookie the browser happens to have.
  *
- * There is no payment step yet (a separate, not-yet-designed piece of
- * the platform) — every "Adicionar" writes the item to the real order
- * immediately, the same one the kitchen/production board already reads.
+ * "Pagamento aprovado" is simulated (no real gateway yet, decisão da
+ * Tarefa 5/N) — `confirm_customer_payment()` just moves the order out of
+ * `awaiting_payment`, which is what actually releases it to the
+ * kitchen/production board (Etapa 1/N do fluxo Totem/Tablet com senha).
  */
 export function CustomerOrderPage({
   locationId,
@@ -59,7 +61,11 @@ export function CustomerOrderPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [startedOrdering, setStartedOrdering] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [paying, setPaying] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [pickupNumber, setPickupNumber] = useState<number | null>(null);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -222,6 +228,29 @@ export function CustomerOrderPage({
     });
   }
 
+  async function handleConfirmPayment() {
+    if (!tab?.access_token || !orderId) return;
+    setError(null);
+    setPaying(true);
+
+    const { data, error: payError } = await anonRpc<Order>("confirm_customer_payment", {
+      p_token: tab.access_token,
+      p_order_id: orderId,
+      p_customer_name: customerName,
+    });
+
+    setPaying(false);
+
+    if (payError || !data) {
+      setError(payError ?? "Não foi possível confirmar o pagamento.");
+      return;
+    }
+
+    setPickupNumber(data.pickup_number);
+    setCheckingOut(false);
+    setFinished(true);
+  }
+
   if (loading) {
     return <p className="p-6 text-center text-muted">Carregando...</p>;
   }
@@ -245,8 +274,53 @@ export function CustomerOrderPage({
   if (finished) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="text-2xl">Pedido enviado! ✅</p>
-        <p className="text-lg text-muted">Dirija-se ao balcão para pagar e retirar seu pedido.</p>
+        <p className="text-2xl">Pagamento aprovado! ✅</p>
+        {pickupNumber != null && (
+          <p className="text-5xl font-extrabold text-brand">Nº {pickupNumber}</p>
+        )}
+        <p className="text-lg text-muted">
+          Fique de olho no painel — vamos te chamar por essa senha quando o pedido estiver pronto
+          para retirar no balcão.
+        </p>
+      </main>
+    );
+  }
+
+  if (checkingOut) {
+    const checkoutTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
+        <p className="text-2xl">Quase lá!</p>
+        <div className="flex w-full max-w-sm flex-col gap-1.5 text-left">
+          <label htmlFor="customer-name" className="text-sm font-medium">
+            Qual seu nome?
+          </label>
+          <Input
+            id="customer-name"
+            value={customerName}
+            onChange={(event) => setCustomerName(event.target.value)}
+            placeholder="Pra te chamar no painel"
+            autoFocus
+          />
+        </div>
+        <p className="text-lg font-semibold">
+          Total: {checkoutTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+        </p>
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <Button
+          size="lg"
+          disabled={!customerName.trim() || paying}
+          onClick={handleConfirmPayment}
+        >
+          {paying ? "Confirmando..." : "Pagamento aprovado (simulado)"}
+        </Button>
+        <button
+          className="text-sm text-muted underline underline-offset-4"
+          onClick={() => setCheckingOut(false)}
+        >
+          Voltar ao cardápio
+        </button>
       </main>
     );
   }
@@ -304,7 +378,7 @@ export function CustomerOrderPage({
           title="Seu pedido"
           lines={cartLines}
           actionLabel="Finalizar pedido"
-          onAction={() => setFinished(true)}
+          onAction={() => setCheckingOut(true)}
           emptyLabel="Adicione itens do cardápio."
           onRemove={handleRemoveFromCart}
         />

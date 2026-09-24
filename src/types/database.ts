@@ -751,6 +751,10 @@ export interface Database {
         Args: { p_token: string; p_item_id: string };
         Returns: void;
       };
+      confirm_customer_payment: {
+        Args: { p_token: string; p_order_id: string; p_customer_name: string };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
     };
     Enums: Record<string, never>;
   };
