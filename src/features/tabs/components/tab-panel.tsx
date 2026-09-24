@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 
 import { createDbClient } from "@/lib/db/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import type { Product } from "@/types/catalog";
+import { Badge } from "@/components/ui/badge";
+import { CategoryPills } from "@/components/pos/category-pills";
+import { ProductCard } from "@/components/pos/product-card";
+import type { Category, Product } from "@/types/catalog";
 import type { Order, OrderItem, Tab } from "@/types/order";
 
 type OrderWithItems = Order & {
@@ -39,11 +41,13 @@ async function fetchOrders(tabId: string) {
 export function TabPanel({
   tab,
   products,
+  categories,
   userId,
   onCloseTab,
 }: {
   tab: Tab;
   products: Product[];
+  categories: Category[];
   userId: string;
   onCloseTab: () => void;
 }) {
@@ -102,6 +106,7 @@ export function TabPanel({
           key={order.id}
           order={order}
           products={products}
+          categories={categories}
           tenantId={tab.tenant_id}
           onChanged={reload}
         />
@@ -126,16 +131,18 @@ export function TabPanel({
 function OrderCard({
   order,
   products,
+  categories,
   tenantId,
   onChanged,
 }: {
   order: OrderWithItems;
   products: Product[];
+  categories: Category[];
   tenantId: string;
   onChanged: () => Promise<void>;
 }) {
-  const [productId, setProductId] = useState("");
-  const [quantity, setQuantity] = useState("1");
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleConfirmPayment() {
@@ -167,21 +174,14 @@ function OrderCard({
     await onChanged();
   }
 
-  async function handleAddItem(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleAddProduct(product: Product) {
     setError(null);
-
-    const qty = Number(quantity);
-    if (!productId || !Number.isInteger(qty) || qty <= 0) {
-      setError("Selecione um produto e uma quantidade válida.");
-      return;
-    }
 
     const db = createDbClient();
     const { error: insertError } = await db.from("order_items").insert({
       order_id: order.id,
-      product_id: productId,
-      quantity: qty,
+      product_id: product.id,
+      quantity: 1,
     });
 
     if (insertError) {
@@ -189,19 +189,21 @@ function OrderCard({
       return;
     }
 
-    setProductId("");
-    setQuantity("1");
     await onChanged();
   }
 
+  const visibleProducts = activeCategoryId
+    ? products.filter((product) => product.category_id === activeCategoryId)
+    : products;
+
   return (
-    <div className="rounded-md border border-neutral-200 p-3">
+    <div className="rounded-md border border-border p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium">Pedido</span>
         <div className="flex items-center gap-2">
-          <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-xs">
+          <Badge variant={order.order_statuses?.key === "awaiting_payment" ? "warning" : "neutral"}>
             {order.order_statuses?.label ?? "—"}
-          </span>
+          </Badge>
           {order.order_statuses?.key === "awaiting_payment" && (
             <Button size="sm" onClick={handleConfirmPayment}>
               Confirmar pagamento
@@ -223,35 +225,39 @@ function OrderCard({
             </span>
           </li>
         ))}
-        {order.items.length === 0 && (
-          <li className="text-sm text-neutral-400">Sem itens ainda.</li>
-        )}
+        {order.items.length === 0 && <li className="text-sm text-muted">Sem itens ainda.</li>}
       </ul>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      <form onSubmit={handleAddItem} className="mt-2 flex gap-2">
-        <select
-          className="h-9 flex-1 rounded-md border border-neutral-200 bg-transparent px-2 text-sm"
-          value={productId}
-          onChange={(event) => setProductId(event.target.value)}
-        >
-          <option value="">Selecione um produto</option>
-          {products.map((product) => (
-            <option key={product.id} value={product.id}>
-              {product.name}
-            </option>
-          ))}
-        </select>
-        <Input
-          type="number"
-          min={1}
-          className="w-16"
-          value={quantity}
-          onChange={(event) => setQuantity(event.target.value)}
-        />
-        <Button type="submit" size="sm">
-          Adicionar
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+
+      {adding ? (
+        <div className="mt-3 flex flex-col gap-2">
+          <CategoryPills
+            categories={categories}
+            activeId={activeCategoryId}
+            onSelect={setActiveCategoryId}
+          />
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {visibleProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                name={product.name}
+                price={Number(product.price)}
+                onAdd={() => handleAddProduct(product)}
+              />
+            ))}
+            {visibleProducts.length === 0 && (
+              <p className="col-span-full text-sm text-muted">Nenhum produto nesta categoria.</p>
+            )}
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setAdding(false)} className="self-start">
+            Concluir
+          </Button>
+        </div>
+      ) : (
+        <Button variant="outline" size="sm" className="mt-2" onClick={() => setAdding(true)}>
+          Adicionar item
         </Button>
-      </form>
+      )}
     </div>
   );
 }

@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 
 import { anonRpc, anonSelect } from "@/lib/db/anonymous";
 import { Button } from "@/components/ui/button";
+import { CategoryPills } from "@/components/pos/category-pills";
+import { ProductCard } from "@/components/pos/product-card";
+import { CartPanel, type CartLine } from "@/components/pos/cart-panel";
 import type { Category, ConsumptionLocation, Product } from "@/types/catalog";
 import type { Tab } from "@/types/order";
 import type { Order, OrderItem } from "@/types/order";
@@ -50,6 +53,7 @@ export function CustomerOrderPage({
   const [error, setError] = useState<string | null>(null);
   const [startedOrdering, setStartedOrdering] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,18 +186,18 @@ export function CustomerOrderPage({
   }
 
   if (loading) {
-    return <p className="p-6 text-center text-neutral-500">Carregando...</p>;
+    return <p className="p-6 text-center text-muted">Carregando...</p>;
   }
 
   if (error && !tab) {
-    return <p className="p-6 text-center text-sm text-red-600">{error}</p>;
+    return <p className="p-6 text-center text-sm text-danger">{error}</p>;
   }
 
   if (!startedOrdering) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
         <p className="text-2xl">Olá! 👋</p>
-        <p className="text-lg text-neutral-500">Como você deseja fazer seu pedido?</p>
+        <p className="text-lg text-muted">Como você deseja fazer seu pedido?</p>
         <Button size="lg" onClick={() => setStartedOrdering(true)}>
           Fazer meu pedido
         </Button>
@@ -205,91 +209,62 @@ export function CustomerOrderPage({
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="text-2xl">Pedido enviado! ✅</p>
-        <p className="text-lg text-neutral-500">
-          Dirija-se ao balcão para pagar e retirar seu pedido.
-        </p>
+        <p className="text-lg text-muted">Dirija-se ao balcão para pagar e retirar seu pedido.</p>
       </main>
     );
   }
 
-  const uncategorized = products.filter((product) => !product.category_id);
-  const cartTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const visibleProducts = activeCategoryId
+    ? products.filter((product) => product.category_id === activeCategoryId)
+    : products;
+
+  const cartLines: CartLine[] = Object.values(
+    cart.reduce<Record<string, CartLine>>((lines, item) => {
+      const key = `${item.name}:${item.unitPrice}`;
+      const existing = lines[key];
+      lines[key] = existing
+        ? { ...existing, quantity: existing.quantity + item.quantity }
+        : { key, name: item.name, unitPrice: item.unitPrice, quantity: item.quantity };
+      return lines;
+    }, {}),
+  );
 
   return (
-    <main className="flex flex-1 flex-col gap-6 px-6 py-8">
-      <h1 className="text-xl font-semibold">{location?.label}</h1>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+    <main className="flex flex-1 flex-col lg:flex-row">
+      <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-6">
+        <h1 className="text-xl font-semibold">{location?.label}</h1>
+        {error && <p className="text-sm text-danger">{error}</p>}
 
-      {categories.map((category) => {
-        const categoryProducts = products.filter(
-          (product) => product.category_id === category.id,
-        );
-        if (categoryProducts.length === 0) return null;
+        <CategoryPills
+          categories={categories}
+          activeId={activeCategoryId}
+          onSelect={setActiveCategoryId}
+        />
 
-        return (
-          <section key={category.id} className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium text-neutral-500">{category.name}</h2>
-            <ul className="flex flex-col gap-2">
-              {categoryProducts.map((product) => (
-                <li
-                  key={product.id}
-                  className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{product.name}</p>
-                    <p className="text-xs text-neutral-400">
-                      {Number(product.price).toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </p>
-                  </div>
-                  <Button size="sm" onClick={() => handleAddToCart(product)}>
-                    Adicionar
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
-
-      {uncategorized.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-neutral-500">Outros</h2>
-          <ul className="flex flex-col gap-2">
-            {uncategorized.map((product) => (
-              <li
-                key={product.id}
-                className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2"
-              >
-                <div>
-                  <p className="text-sm font-medium">{product.name}</p>
-                  <p className="text-xs text-neutral-400">
-                    {Number(product.price).toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })}
-                  </p>
-                </div>
-                <Button size="sm" onClick={() => handleAddToCart(product)}>
-                  Adicionar
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {cart.length > 0 && (
-        <div className="bg-background sticky bottom-0 flex flex-col gap-2 border-t border-neutral-200 py-3">
-          <p className="text-sm font-medium">
-            Seu pedido: {cart.length} {cart.length === 1 ? "item" : "itens"} —{" "}
-            {cartTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-          </p>
-          <Button onClick={() => setFinished(true)}>Finalizar pedido</Button>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {visibleProducts.map((product) => (
+            <ProductCard
+              key={product.id}
+              name={product.name}
+              price={Number(product.price)}
+              onAdd={() => handleAddToCart(product)}
+            />
+          ))}
+          {visibleProducts.length === 0 && (
+            <p className="col-span-full text-sm text-muted">Nenhum produto nesta categoria.</p>
+          )}
         </div>
-      )}
+      </div>
+
+      <aside className="border-t border-border bg-surface px-4 py-4 sm:px-6 lg:sticky lg:top-0 lg:h-screen lg:w-80 lg:shrink-0 lg:border-t-0 lg:border-l">
+        <CartPanel
+          title="Seu pedido"
+          lines={cartLines}
+          actionLabel="Finalizar pedido"
+          onAction={() => setFinished(true)}
+          emptyLabel="Adicione itens do cardápio."
+        />
+      </aside>
     </main>
   );
 }

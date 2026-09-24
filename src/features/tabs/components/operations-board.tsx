@@ -7,7 +7,7 @@ import { createDbClient } from "@/lib/db/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TabPanel } from "@/features/tabs/components/tab-panel";
-import type { ConsumptionLocation, Product } from "@/types/catalog";
+import type { Category, ConsumptionLocation, Product } from "@/types/catalog";
 import type { Tab } from "@/types/order";
 
 type LocationWithTab = ConsumptionLocation & { openTab: Tab | null };
@@ -28,14 +28,16 @@ async function fetchBoard(tenantId: string) {
 
   const unitId = unitRes.data.id;
 
-  const [locationsRes, tabsRes, productsRes] = await Promise.all([
+  const [locationsRes, tabsRes, productsRes, categoriesRes] = await Promise.all([
     db.from("consumption_locations").select("*").eq("unit_id", unitId).order("label"),
     db.from("tabs").select("*").eq("tenant_id", tenantId).eq("status", "open"),
     db.from("products").select("*").eq("tenant_id", tenantId).eq("status", "active").order("name"),
+    db.from("categories").select("*").eq("tenant_id", tenantId).order("name"),
   ]);
 
   if (locationsRes.error) return { error: locationsRes.error.message };
   if (productsRes.error) return { error: productsRes.error.message };
+  if (categoriesRes.error) return { error: categoriesRes.error.message };
 
   const openTabs = tabsRes.data ?? [];
   const locations: LocationWithTab[] = (locationsRes.data ?? []).map((location) => ({
@@ -43,7 +45,12 @@ async function fetchBoard(tenantId: string) {
     openTab: openTabs.find((tab) => tab.consumption_location_id === location.id) ?? null,
   }));
 
-  return { unitId, locations, products: productsRes.data ?? [] };
+  return {
+    unitId,
+    locations,
+    products: productsRes.data ?? [],
+    categories: categoriesRes.data ?? [],
+  };
 }
 
 export function OperationsBoard({ tenantId }: { tenantId: string }) {
@@ -53,6 +60,7 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
   const [unitId, setUnitId] = useState<string | null>(null);
   const [locations, setLocations] = useState<LocationWithTab[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newLocationLabel, setNewLocationLabel] = useState("");
@@ -67,6 +75,7 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
     setUnitId(result.unitId ?? null);
     setLocations(result.locations ?? []);
     setProducts(result.products ?? []);
+    setCategories(result.categories ?? []);
   }
 
   useEffect(() => {
@@ -80,6 +89,7 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
         setUnitId(result.unitId ?? null);
         setLocations(result.locations ?? []);
         setProducts(result.products ?? []);
+        setCategories(result.categories ?? []);
       }
       setLoading(false);
     });
@@ -185,6 +195,7 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
                   <TabPanel
                     tab={location.openTab}
                     products={products}
+                    categories={categories}
                     userId={userId ?? ""}
                     onCloseTab={() => handleCloseTab(location.openTab!.id)}
                   />
