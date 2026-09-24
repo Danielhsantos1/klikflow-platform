@@ -128,6 +128,15 @@
   continuam com zero grant para `anonymous`; o carrinho do cliente
   (`CustomerOrderPage`) é montado só a partir do que as próprias RPCs
   da Tarefa 3/N devolvem, nunca de um SELECT direto nessas tabelas.
+- **"Confirmar pagamento" é um UPDATE de status como outro qualquer,
+  não um caminho especial (Canais de Atendimento, Tarefa 5/N)**: o
+  botão em `TabPanel` só faz `orders.status_id = <id do status 'new'>`
+  — passa pela mesma `validate_order_status_transition()` da Tarefa 06
+  e pela mesma policy `orders_update_admin` (exige `orders.manage`) de
+  sempre. Não existe RPC nem policy nova para essa ação: um Pedido
+  `awaiting_payment` só avança porque `create_tenant()`/o backfill
+  cadastraram essa transição no grafo — tentar pular pra qualquer outro
+  status continua bloqueado como qualquer transição não configurada.
 
 - ~~Fluxo de autenticação completo (login/signup)~~ — **fechado na
   Tarefa 07**: UI real (`/login`, `/signup`, `/app`) sobre a

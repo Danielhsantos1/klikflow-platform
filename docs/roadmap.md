@@ -440,9 +440,34 @@ tarefas sequenciais.
   fluxo descrito pelo usuário na análise original. Isso é a Tarefa
   5/N, e exige uma decisão própria de gateway de pagamento antes de
   qualquer código.
-- **Próximo**: Tarefa 5/N — decisão de pagamento (qual gateway, como
-  representar "aguardando pagamento" vs "confirmado" no `order_status`
-  configurável da Tarefa 06).
+- **Decisão do usuário (Tarefa 5/N)**: sem gateway de pagamento nesta
+  primeira versão — o cliente monta o pedido pelo QR/Totem, mas paga no
+  balcão com a equipe (dinheiro, maquininha, Pix manual), como já é
+  comum em totens de autoatendimento reais.
+- **Concluído (Tarefa 5/N — Aguardando pagamento)**:
+  `db/migrations/0015_awaiting_payment_status.sql` — reaproveita
+  inteiramente a máquina de status configurável da Tarefa 06, nenhuma
+  tabela nova. `default_order_status()` agora olha o `channel` da
+  Comanda: um Pedido `qr_code`/`totem` nasce em `awaiting_payment`
+  (status novo, sequence 0); um Pedido `staff` continua nascendo em
+  `new`, sem nenhuma mudança. `create_tenant()` semeia
+  `awaiting_payment` e as transições (`→ new`, `→ cancelled`) pra
+  tenant novo; backfill aplicado aos dois tenants existentes.
+  `TabPanel` (Comandas, Tarefa 09) ganhou o botão "Confirmar pagamento"
+  num Pedido `awaiting_payment`, que move pra `new` — dali em diante é
+  o mesmo fluxo de sempre (Produção, Tarefa 10, nem percebe a
+  diferença). A tela do cliente ganhou o aviso "Dirija-se ao balcão
+  para pagar e confirmar seu pedido."
+- **Testado via SQL contra o Neon real**: criado um Pedido `staff` de
+  teste → confirmado que nasceu em `new` (comportamento antigo
+  intacto); criado um Pedido `qr_code`/`totem` de teste → confirmado
+  que nasceu em `awaiting_payment`; `update` manual pra `new` aceito
+  (a transição configurada funciona). Dados de teste limpos depois.
+- **Próximo**: nenhuma tarefa nova planejada além desta — a
+  funcionalidade "Canais de Atendimento" está com seu núcleo completo
+  (Tarefas 1-5/N). Itens 6-8/N da análise original (identificação do
+  canal na gestão, configuração de canais habilitados por empresa)
+  ficam para quando o usuário pedir.
 
 ## Próximos passos (fora do escopo desta tarefa)
 

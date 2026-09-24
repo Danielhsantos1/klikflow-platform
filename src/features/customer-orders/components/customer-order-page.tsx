@@ -246,10 +246,13 @@ export function CustomerOrderPage({
       )}
 
       {cart.length > 0 && (
-        <div className="bg-background sticky bottom-0 flex flex-col gap-2 border-t border-neutral-200 py-3">
+        <div className="bg-background sticky bottom-0 flex flex-col gap-1 border-t border-neutral-200 py-3">
           <p className="text-sm font-medium">
             Seu pedido: {cart.length} {cart.length === 1 ? "item" : "itens"} —{" "}
             {cartTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          </p>
+          <p className="text-xs text-neutral-400">
+            Dirija-se ao balcão para pagar e confirmar seu pedido.
           </p>
         </div>
       )}

@@ -38,7 +38,7 @@ relacionado.
 
 ## Como aplicar as migrations
 
-As 14 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
+As 15 migrations abaixo já foram aplicadas ao projeto `klikflow` (branch
 `production`) via MCP do Neon (`run_sql_transaction`), na ordem dos
 arquivos. Para reaplicar em outro branch/projeto:
 
@@ -69,6 +69,7 @@ existe um estado intermediário exposto.
 | `0012_order_channels.sql` | Canais de Atendimento (Tarefa 2/N — só schema): `tabs.channel` (`staff`/`qr_code`/`totem`, default `staff`) e `tabs.access_token` (identifica uma Comanda de cliente sem conta), com `tabs_channel_access_token_check` garantindo que só um canal ≠ `staff` tenha token. `tabs.opened_by` vira nullable — uma Comanda de cliente não tem funcionário que a abriu. Nenhuma RPC ou policy nova ainda; comportamento de `staff` inalterado (confirmado: tabs existentes ganharam `channel = 'staff'` sem nenhuma mudança visível). |
 | `0013_customer_channel_rpcs.sql` | Canais de Atendimento (Tarefa 3/N): `orders.created_by` vira nullable (mesmo motivo do `opened_by`). 4 funções `SECURITY DEFINER`, concedidas ao role `anonymous` da Data API — `open_customer_tab`, `get_customer_tab`, `create_customer_order`, `add_customer_order_item`. Cada uma valida o `access_token` contra o banco antes de tocar em qualquer linha; nenhuma confia em `tenant_id`/`tab_id`/`order_id` vindo do cliente sem essa prova. Sem policy de RLS nova para `anonymous` — toda escrita do cliente passa por estas RPCs, nunca por INSERT direto. |
 | `0014_public_menu_read.sql` | Canais de Atendimento (Tarefa 4/N): primeiro `GRANT SELECT` da história do projeto para `anonymous` — só em `tenants`, `categories`, `products`, `consumption_locations`, e só policies `using (status = 'active')`. `tabs`/`orders`/`order_items` continuam sem nenhum grant para `anonymous`; a única porta de escrita/leitura de pedido do cliente são as RPCs da Tarefa 3/N. |
+| `0015_awaiting_payment_status.sql` | Canais de Atendimento (Tarefa 5/N — sem gateway, pagamento no balcão): `default_order_status()` passa a checar o `channel` da Comanda — um Pedido de canal `qr_code`/`totem` nasce em `awaiting_payment` (novo status, sequence 0), um Pedido de canal `staff` continua nascendo em `new` como sempre. `create_tenant()` semeia `awaiting_payment` + transições (`awaiting_payment → new`, `awaiting_payment → cancelled`) para tenants novos; backfill aplicado aos existentes. Nenhuma tabela nova — reaproveita 100% a máquina de status configurável da Tarefa 06. |
 
 ## Entidades
 

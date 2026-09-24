@@ -9,7 +9,7 @@ import type { Product } from "@/types/catalog";
 import type { Order, OrderItem, Tab } from "@/types/order";
 
 type OrderWithItems = Order & {
-  order_statuses: { label: string } | null;
+  order_statuses: { key: string; label: string } | null;
   items: OrderItem[];
 };
 
@@ -17,14 +17,14 @@ async function fetchOrders(tabId: string) {
   const db = createDbClient();
   const { data, error } = await db
     .from("orders")
-    .select("*, order_statuses(label), order_items(*)")
+    .select("*, order_statuses(key, label), order_items(*)")
     .eq("tab_id", tabId)
     .order("created_at");
 
   if (error) return { error: error.message };
 
   type RawOrder = Order & {
-    order_statuses: { label: string } | null;
+    order_statuses: { key: string; label: string } | null;
     order_items: OrderItem[];
   };
 
@@ -98,7 +98,13 @@ export function TabPanel({
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {orders.map((order) => (
-        <OrderCard key={order.id} order={order} products={products} onChanged={reload} />
+        <OrderCard
+          key={order.id}
+          order={order}
+          products={products}
+          tenantId={tab.tenant_id}
+          onChanged={reload}
+        />
       ))}
 
       {orders.length === 0 && (
@@ -120,15 +126,46 @@ export function TabPanel({
 function OrderCard({
   order,
   products,
+  tenantId,
   onChanged,
 }: {
   order: OrderWithItems;
   products: Product[];
+  tenantId: string;
   onChanged: () => Promise<void>;
 }) {
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [error, setError] = useState<string | null>(null);
+
+  async function handleConfirmPayment() {
+    setError(null);
+    const db = createDbClient();
+
+    const { data: newStatus, error: statusError } = await db
+      .from("order_statuses")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("key", "new")
+      .maybeSingle();
+
+    if (statusError || !newStatus) {
+      setError(statusError?.message ?? "Status 'Novo' não configurado para esta empresa.");
+      return;
+    }
+
+    const { error: updateError } = await db
+      .from("orders")
+      .update({ status_id: newStatus.id })
+      .eq("id", order.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    await onChanged();
+  }
 
   async function handleAddItem(event: React.FormEvent) {
     event.preventDefault();
@@ -161,9 +198,16 @@ function OrderCard({
     <div className="rounded-md border border-neutral-200 p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium">Pedido</span>
-        <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-xs">
-          {order.order_statuses?.label ?? "—"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-xs">
+            {order.order_statuses?.label ?? "—"}
+          </span>
+          {order.order_statuses?.key === "awaiting_payment" && (
+            <Button size="sm" onClick={handleConfirmPayment}>
+              Confirmar pagamento
+            </Button>
+          )}
+        </div>
       </div>
       <ul className="flex flex-col gap-1">
         {order.items.map((item) => (
