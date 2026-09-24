@@ -27,6 +27,34 @@ function greeting() {
   return "Boa noite";
 }
 
+const ORDER_STATUS_POLL_MS = 5000;
+
+/** Short two-tone beep via Web Audio — no audio file to ship/host. */
+function playReadyChime() {
+  try {
+    const AudioContextClass =
+      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
+    const context = new AudioContextClass();
+
+    [880, 1320].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.frequency.value = frequency;
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      const startAt = context.currentTime + index * 0.22;
+      gain.gain.setValueAtTime(0.2, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.2);
+      oscillator.start(startAt);
+      oscillator.stop(startAt + 0.2);
+    });
+  } catch {
+    // Best-effort only — some browsers block audio without a prior user
+    // gesture. The visual "Pronto!" state still updates regardless.
+  }
+}
+
 /**
  * The customer-facing ordering screen for the "Canais de Atendimento"
  * feature (QR Code / Totem — same component serves both, only the
@@ -66,7 +94,42 @@ export function CustomerOrderPage({
   const [paying, setPaying] = useState(false);
   const [finished, setFinished] = useState(false);
   const [pickupNumber, setPickupNumber] = useState<number | null>(null);
+  const [orderStatusKey, setOrderStatusKey] = useState<string | null>(null);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+
+  const accessToken = tab?.access_token ?? null;
+
+  useEffect(() => {
+    if (!finished || !accessToken || !orderId) return;
+
+    let cancelled = false;
+    let previousKey: string | null = null;
+
+    async function poll() {
+      const { data } = await anonRpc<{
+        status_key: string;
+        status_label: string;
+        pickup_number: number | null;
+      }>("get_customer_order_status", { p_token: accessToken, p_order_id: orderId });
+
+      if (cancelled || !data) return;
+
+      if (previousKey && previousKey !== "ready" && data.status_key === "ready") {
+        playReadyChime();
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      }
+      previousKey = data.status_key;
+      setOrderStatusKey(data.status_key);
+    }
+
+    poll();
+    const interval = setInterval(poll, ORDER_STATUS_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [finished, accessToken, orderId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,15 +335,18 @@ export function CustomerOrderPage({
   }
 
   if (finished) {
+    const isReady = orderStatusKey === "ready";
+
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="text-2xl">Pagamento aprovado! ✅</p>
+        <p className="text-2xl">{isReady ? "Pedido pronto! 🎉" : "Pagamento aprovado! ✅"}</p>
         {pickupNumber != null && (
           <p className="text-5xl font-extrabold text-brand">Nº {pickupNumber}</p>
         )}
         <p className="text-lg text-muted">
-          Fique de olho no painel — vamos te chamar por essa senha quando o pedido estiver pronto
-          para retirar no balcão.
+          {isReady
+            ? "Pode retirar no balcão!"
+            : "Preparando seu pedido... fique com a tela aberta, vamos te avisar por aqui quando ficar pronto."}
         </p>
       </main>
     );

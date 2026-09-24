@@ -755,6 +755,10 @@ export interface Database {
         Args: { p_token: string; p_order_id: string; p_customer_name: string };
         Returns: Database["public"]["Tables"]["orders"]["Row"];
       };
+      get_customer_order_status: {
+        Args: { p_token: string; p_order_id: string };
+        Returns: { status_key: string; status_label: string; pickup_number: number | null };
+      };
     };
     Enums: Record<string, never>;
   };
