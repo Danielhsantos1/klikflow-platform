@@ -233,9 +233,9 @@ function OrderCard({
 
   return (
     <div className="rounded-md border border-border p-3">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium">Pedido</span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant={order.order_statuses?.key === "awaiting_payment" ? "warning" : "neutral"}>
             {order.order_statuses?.label ?? "—"}
           </Badge>
