@@ -48,6 +48,21 @@ export function CustomerOrderPage({
     let cancelled = false;
 
     async function load() {
+      try {
+        await loadImpl();
+      } catch (thrown) {
+        if (!cancelled) {
+          setError(
+            thrown instanceof Error
+              ? `Erro inesperado: ${thrown.message}`
+              : "Erro inesperado ao carregar.",
+          );
+          setLoading(false);
+        }
+      }
+    }
+
+    async function loadImpl() {
       const db = createAnonymousDbClient();
 
       const locationRes = await db
@@ -59,7 +74,11 @@ export function CustomerOrderPage({
       if (cancelled) return;
 
       if (locationRes.error || !locationRes.data) {
-        setError("Local não encontrado.");
+        setError(
+          locationRes.error
+            ? `Local não encontrado: ${locationRes.error.message}`
+            : "Local não encontrado.",
+        );
         setLoading(false);
         return;
       }
