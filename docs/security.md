@@ -137,6 +137,20 @@
   `awaiting_payment` só avança porque `create_tenant()`/o backfill
   cadastraram essa transição no grafo — tentar pular pra qualquer outro
   status continua bloqueado como qualquer transição não configurada.
+- **A tela do cliente nunca herda uma sessão de funcionário do mesmo
+  aparelho (achado real em produção, Tarefa 5/N)**: `createDbClient()`
+  (usado por toda tela logada) sempre injeta o JWT de quem estiver
+  logado no navegador via `/api/session-token` — inclusive sem querer,
+  se um funcionário abrir seu próprio link de QR/Totem pra testar
+  enquanto ainda está logado noutra empresa. Isso quebrou o cardápio
+  público em produção: o pedido de leitura foi avaliado como
+  `authenticated`, não `anonymous`, e o `is_tenant_member()` da outra
+  empresa bloqueou. `src/lib/db/client.ts` ganhou
+  `createAnonymousDbClient()` — `getToken` fixo em `async () => null`,
+  nunca lê `/api/session-token` — e é o único cliente que
+  `CustomerOrderPage` usa. O comportamento do canal de cliente agora
+  independe de qualquer sessão de staff que por acaso exista no mesmo
+  navegador.
 
 - ~~Fluxo de autenticação completo (login/signup)~~ — **fechado na
   Tarefa 07**: UI real (`/login`, `/signup`, `/app`) sobre a

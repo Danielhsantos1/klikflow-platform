@@ -463,6 +463,25 @@ tarefas sequenciais.
   intacto); criado um Pedido `qr_code`/`totem` de teste → confirmado
   que nasceu em `awaiting_payment`; `update` manual pra `new` aceito
   (a transição configurada funciona). Dados de teste limpos depois.
+### Correção pós-deploy: tela do cliente herdando sessão de funcionário
+
+Ao testar a Tarefa 5/N em produção, o link `/pedir/[locationId]`
+retornou "Local não encontrado." — mas só porque o navegador de teste
+ainda estava logado como funcionário de OUTRA empresa
+("Restaurante teste"). `createDbClient()` (o cliente Data API usado por
+toda tela logada) sempre injeta o JWT de quem estiver logado no
+navegador via `/api/session-token`, então a leitura pública do
+cardápio virou uma leitura `authenticated` daquele outro funcionário —
+e `is_tenant_member()` corretamente bloqueou, já que ele não pertence à
+Cafe Daniel.
+
+Corrigido: `src/lib/db/client.ts` ganhou `createAnonymousDbClient()`
+(`getToken` fixo em `async () => null`, nunca consulta
+`/api/session-token`), e é o único cliente que `CustomerOrderPage` usa
+agora. O canal de cliente nunca mais depende de qual conta de
+funcionário, se alguma, estiver logada no mesmo aparelho — inclusive
+quando é o próprio dono da empresa testando seu QR code.
+
 - **Próximo**: nenhuma tarefa nova planejada além desta — a
   funcionalidade "Canais de Atendimento" está com seu núcleo completo
   (Tarefas 1-5/N). Itens 6-8/N da análise original (identificação do

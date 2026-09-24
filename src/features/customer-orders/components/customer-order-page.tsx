@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { createDbClient } from "@/lib/db/client";
+import { createAnonymousDbClient } from "@/lib/db/client";
 import { Button } from "@/components/ui/button";
 import type { Category, ConsumptionLocation, Product } from "@/types/catalog";
 import type { Tab } from "@/types/order";
@@ -48,7 +48,7 @@ export function CustomerOrderPage({
     let cancelled = false;
 
     async function load() {
-      const db = createDbClient();
+      const db = createAnonymousDbClient();
 
       const locationRes = await db
         .from("consumption_locations")
@@ -116,7 +116,7 @@ export function CustomerOrderPage({
     if (!tab?.access_token) return;
     setError(null);
 
-    const db = createDbClient();
+    const db = createAnonymousDbClient();
     let currentOrderId = orderId;
 
     if (!currentOrderId) {

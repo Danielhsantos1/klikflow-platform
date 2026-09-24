@@ -43,3 +43,23 @@ export function createDbClient() {
     },
   });
 }
+
+/**
+ * For public, no-login surfaces (`CustomerOrderPage` — Canais de
+ * Atendimento). Never attaches a token, even if the same browser
+ * happens to also have a staff session cookie (e.g. a manager opening
+ * their own QR code link to demo it) — a customer's request must
+ * always hit the Data API as the `anonymous` role, or RLS resolves
+ * against whichever staff account is logged in on that device instead
+ * of behaving the same for everyone.
+ */
+export function createAnonymousDbClient() {
+  const { dataApi } = defaultDeriveNeonUrls(process.env.NEXT_PUBLIC_NEON_DATABASE_URL!);
+
+  return createClient<Database>({
+    dataApi: {
+      url: dataApi,
+      getToken: async () => null,
+    },
+  });
+}
