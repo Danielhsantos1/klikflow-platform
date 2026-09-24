@@ -427,10 +427,12 @@ tarefas sequenciais.
   só o parâmetro muda. O token de sessão do cliente fica no
   `localStorage` da própria página, escopado por local — recarregar a
   página retoma a mesma Comanda em vez de abrir uma nova.
-- **Testado**: `npm run build`/`npm run lint` sem erros; a rota
-  responde 200 e renderiza o estado inicial de carregamento. O fluxo
-  completo (abrir link → ver cardápio → adicionar item) depende do
-  Neon real e fica para o usuário confirmar em produção.
+- **Fechado**: usuário confirmou em produção pelo canal `totem`
+  (`?channel=totem`) na "Mesa 1" da Cafe Daniel — abriu o link, viu o
+  cardápio, adicionou Coca Cola e Coxinha Frango, carrinho mostrou
+  "2 itens — R$ 17,00". Conferido direto no banco: comanda real criada
+  com `channel = 'totem'` e `opened_by = null` (nenhum funcionário
+  envolvido), pedido e os 2 itens com snapshot de preço corretos.
 - **Limitação conhecida, documentada e fora do escopo**: não existe
   pagamento. Cada "Adicionar" grava o item de verdade no Pedido
   imediatamente (o mesmo que a Produção/Tarefa 10 já lê) — não há
