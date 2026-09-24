@@ -94,12 +94,20 @@ export function TabPanel({
   }
 
   if (loading) {
-    return <p className="text-sm text-neutral-500">Carregando pedidos...</p>;
+    return <p className="text-sm text-muted">Carregando pedidos...</p>;
   }
+
+  const tabTotal = orders
+    .filter((order) => order.order_statuses?.key !== "cancelled")
+    .reduce(
+      (sum, order) =>
+        sum + order.items.reduce((itemSum, item) => itemSum + Number(item.unit_price) * item.quantity, 0),
+      0,
+    );
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       {orders.map((order) => (
         <OrderCard
@@ -112,9 +120,14 @@ export function TabPanel({
         />
       ))}
 
-      {orders.length === 0 && (
-        <p className="text-sm text-neutral-400">Nenhum pedido nesta comanda ainda.</p>
-      )}
+      {orders.length === 0 && <p className="text-sm text-muted">Nenhum pedido nesta comanda ainda.</p>}
+
+      <div className="flex items-center justify-between border-t border-border pt-3">
+        <span className="text-sm font-semibold">
+          Total da comanda:{" "}
+          {tabTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+        </span>
+      </div>
 
       <div className="flex justify-between">
         <Button variant="outline" size="sm" onClick={handleNewOrder}>
@@ -192,9 +205,31 @@ function OrderCard({
     await onChanged();
   }
 
+  async function handleRemoveItem(itemId: string) {
+    setError(null);
+
+    const db = createDbClient();
+    const { error: deleteError } = await db.from("order_items").delete().eq("id", itemId);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    await onChanged();
+  }
+
   const visibleProducts = activeCategoryId
     ? products.filter((product) => product.category_id === activeCategoryId)
     : products;
+
+  const canEditItems =
+    order.order_statuses?.key === "new" || order.order_statuses?.key === "awaiting_payment";
+
+  const orderTotal = order.items.reduce(
+    (sum, item) => sum + Number(item.unit_price) * item.quantity,
+    0,
+  );
 
   return (
     <div className="rounded-md border border-border p-3">
@@ -213,20 +248,35 @@ function OrderCard({
       </div>
       <ul className="flex flex-col gap-1">
         {order.items.map((item) => (
-          <li key={item.id} className="flex justify-between text-sm">
+          <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
             <span>
               {item.quantity}x {item.product_name}
             </span>
-            <span>
+            <span className="flex items-center gap-2">
               {(Number(item.unit_price) * item.quantity).toLocaleString("pt-BR", {
                 style: "currency",
                 currency: "BRL",
               })}
+              {canEditItems && (
+                <button
+                  onClick={() => handleRemoveItem(item.id)}
+                  className="text-xs text-danger hover:underline"
+                  aria-label={`Remover ${item.product_name}`}
+                >
+                  Remover
+                </button>
+              )}
             </span>
           </li>
         ))}
         {order.items.length === 0 && <li className="text-sm text-muted">Sem itens ainda.</li>}
       </ul>
+      {order.items.length > 0 && (
+        <div className="mt-1 flex justify-between border-t border-border pt-1 text-sm font-medium">
+          <span>Subtotal</span>
+          <span>{orderTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+        </div>
+      )}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
       {adding ? (
