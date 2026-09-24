@@ -716,6 +716,32 @@ export interface Database {
         Args: { target_tenant_id: string; perm_key: PermissionKey };
         Returns: boolean;
       };
+      // Canais de Atendimento (QR Code / Totem) — see
+      // db/migrations/0013_customer_channel_rpcs.sql. Called by an
+      // unauthenticated (`anonymous`) customer; each validates the
+      // `access_token` against `tabs` before touching any row.
+      open_customer_tab: {
+        Args: { p_location_id: string; p_channel: "qr_code" | "totem" };
+        Returns: Database["public"]["Tables"]["tabs"]["Row"];
+      };
+      get_customer_tab: {
+        Args: { p_token: string };
+        Returns: Database["public"]["Tables"]["tabs"]["Row"];
+      };
+      create_customer_order: {
+        Args: { p_token: string };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
+      add_customer_order_item: {
+        Args: {
+          p_token: string;
+          p_order_id: string;
+          p_product_id: string;
+          p_quantity: number;
+          p_notes?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["order_items"]["Row"];
+      };
     };
     Enums: Record<string, never>;
   };

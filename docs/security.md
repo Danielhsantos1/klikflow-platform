@@ -118,6 +118,16 @@
   produto de outro tenant foram todos rejeitados. `tabs`/`orders`
   continuam sem nenhuma policy de INSERT/UPDATE para `anonymous` — a
   única porta de escrita do cliente são essas 4 funções.
+- **Leitura pública é a exceção mínima e explícita, nunca o padrão
+  (Canais de Atendimento, Tarefa 4/N)**: `anonymous` ganhou seu
+  primeiro `GRANT SELECT` do projeto, só em 4 tabelas
+  (`tenants`, `categories`, `products`, `consumption_locations`), e só
+  policies `using (status = 'active')` — uma empresa suspensa ou um
+  produto arquivado não aparece pra ninguém de fora. `tabs`, `orders` e
+  `order_items` — onde estaria qualquer dado de um pedido específico —
+  continuam com zero grant para `anonymous`; o carrinho do cliente
+  (`CustomerOrderPage`) é montado só a partir do que as próprias RPCs
+  da Tarefa 3/N devolvem, nunca de um SELECT direto nessas tabelas.
 
 - ~~Fluxo de autenticação completo (login/signup)~~ — **fechado na
   Tarefa 07**: UI real (`/login`, `/signup`, `/app`) sobre a

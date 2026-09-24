@@ -410,10 +410,37 @@ tarefas sequenciais.
   found or inactive for this tenant") e um item num pedido inexistente
   pra aquela Comanda (rejeitado: "order not found for this tab"). Dados
   de teste limpos depois, local "Mesa 1" livre de novo.
-- **Próximo**: Tarefa 4/N — decisão de leitura pública do cardápio
-  (policy de RLS pra `anonymous` em `categories`/`products`, só
-  `status = 'active'`) e a primeira tela do cliente
-  (`/pedir/[locationSlug]` ou equivalente).
+- **Concluído (Tarefa 4/N — Leitura pública do cardápio + primeira
+  tela do cliente)**:
+  `db/migrations/0014_public_menu_read.sql` — primeiro `GRANT SELECT`
+  do projeto pro role `anonymous`, só em `tenants`/`categories`/
+  `products`/`consumption_locations`, só `status = 'active'`.
+  `tabs`/`orders`/`order_items` seguem sem nenhum grant — o carrinho
+  do cliente é montado a partir do retorno das RPCs, nunca de SELECT
+  direto.
+- `CustomerOrderPage` (`src/features/customer-orders/components/`),
+  servida pela rota pública `/pedir/[locationId]` (sem guard de login —
+  é pra ser aberta por alguém sem conta nenhuma): tela "Olá! 👋 Como
+  você deseja fazer seu pedido?" → cardápio por categoria → adicionar
+  ao carrinho. `?channel=totem` na URL diferencia o Totem/Tablet do
+  QR Code/link (default) — mesmo componente, mesmo motor de pedidos,
+  só o parâmetro muda. O token de sessão do cliente fica no
+  `localStorage` da própria página, escopado por local — recarregar a
+  página retoma a mesma Comanda em vez de abrir uma nova.
+- **Testado**: `npm run build`/`npm run lint` sem erros; a rota
+  responde 200 e renderiza o estado inicial de carregamento. O fluxo
+  completo (abrir link → ver cardápio → adicionar item) depende do
+  Neon real e fica para o usuário confirmar em produção.
+- **Limitação conhecida, documentada e fora do escopo**: não existe
+  pagamento. Cada "Adicionar" grava o item de verdade no Pedido
+  imediatamente (o mesmo que a Produção/Tarefa 10 já lê) — não há
+  ainda uma etapa de "revisar → pagar → pedido confirmado" como no
+  fluxo descrito pelo usuário na análise original. Isso é a Tarefa
+  5/N, e exige uma decisão própria de gateway de pagamento antes de
+  qualquer código.
+- **Próximo**: Tarefa 5/N — decisão de pagamento (qual gateway, como
+  representar "aguardando pagamento" vs "confirmado" no `order_status`
+  configurável da Tarefa 06).
 
 ## Próximos passos (fora do escopo desta tarefa)
 
