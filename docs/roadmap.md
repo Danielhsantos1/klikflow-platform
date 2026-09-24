@@ -483,14 +483,30 @@ lança `AuthRequiredError: Authentication required` assim que `getToken`
 resolve `null` — não existe forma suportada de fazer esse cliente pedir
 como o role `anonymous` da Data API, só como um usuário autenticado.
 
-Correção final: `src/lib/db/anonymous.ts` (`anonSelect`/`anonRpc`) —
-`fetch()` puro contra a Data API, sem nenhum header de Authorization,
-o mesmo mecanismo que `scripts/test-*.browser.js` usam desde a Tarefa
-02. `CustomerOrderPage` foi reescrita pra usar só essas duas funções,
-nunca `createDbClient()`/o SDK. `createAnonymousDbClient()` foi
-removida do código (não funcionava para o que foi criada) — o
-comentário em `src/lib/db/client.ts` documenta o porquê, pra ninguém
-tentar esse caminho de novo.
+Terceiro problema, revelado só depois de tirar o SDK do caminho e ver
+o `fetch()` de verdade na aba Network: a Data API do Neon **rejeita
+toda requisição sem `Authorization`** ("missing authentication
+credentials: required authorization bearer token in JWT format",
+HTTP 400) — diferente de PostgREST/Supabase, não existe um fallback de
+"sem token = role anônimo". Acesso anônimo exige um JWT anônimo de
+verdade, emitido pelo plugin `anonymous-token` do Better Auth
+(`GET /token/anonymous`, sem sessão necessária).
+
+**Correção final**: `src/lib/db/anonymous.ts` busca esse token via
+`/api/auth/token/anonymous` (já passa pelo proxy existente), cacheia em
+memória, e manda `Authorization: Bearer <token anônimo>` em toda
+chamada — nunca nenhum header (isso nunca funcionaria) nem o SDK
+(`createDbClient()`/`createAnonymousDbClient()`, removida do código).
+`CustomerOrderPage` usa só `anonSelect`/`anonRpc`.
+
+**Fechado, validado em produção pelo usuário e conferido no banco**:
+cardápio carregou, 2 itens adicionados (Coca Cola + Coxinha Frango),
+resumo do carrinho certo. Consulta direta ao Neon confirmou um Pedido
+novo com `status = awaiting_payment` (a Tarefa 5/N funcionando pela
+primeira vez através do fluxo anônimo real, não só simulado via SQL) e
+os 2 itens com snapshot de preço corretos. A funcionalidade "Canais de
+Atendimento" (Tarefas 1-5/N) está completa e validada de ponta a ponta,
+do cliente sem conta até o status de pagamento pendente.
 
 - **Próximo**: nenhuma tarefa nova planejada além desta — a
   funcionalidade "Canais de Atendimento" está com seu núcleo completo
