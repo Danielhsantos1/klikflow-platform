@@ -11,8 +11,10 @@ import { ProductionBoard } from "@/features/production/components/production-boa
 import { RolesManager } from "@/features/roles/components/roles-manager";
 import { MembersManager } from "@/features/members/components/members-manager";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils/cn";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert } from "@/components/ui/alert";
+import { AppShell, type NavSection } from "@/components/layout/app-shell";
 
 type ActiveTenant = { id: string; name: string };
 type View = "operations" | "production" | "catalog" | "team";
@@ -80,20 +82,28 @@ export function TenantDashboard() {
     if (stuck) {
       return (
         <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-          <p className="text-neutral-500">
-            Isso está demorando mais do que devia.
-          </p>
+          <p className="text-muted">Isso está demorando mais do que devia.</p>
           <Button variant="outline" onClick={() => window.location.reload()}>
             Tentar de novo
           </Button>
         </div>
       );
     }
-    return <p className="text-neutral-500">Carregando...</p>;
+    return (
+      <div className="flex flex-col gap-3 px-6 py-16">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-32 w-full max-w-2xl" />
+        <Skeleton className="h-32 w-full max-w-2xl" />
+      </div>
+    );
   }
 
   if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
+    return (
+      <div className="px-6 py-16">
+        <Alert variant="danger">Algo não saiu como esperado. {error}</Alert>
+      </div>
+    );
   }
 
   if (!tenant) {
@@ -104,45 +114,54 @@ export function TenantDashboard() {
     );
   }
 
-  const tabs: { key: View; label: string }[] = [
-    { key: "operations", label: "Comandas" },
-    { key: "production", label: "Produção" },
-    { key: "catalog", label: "Catálogo" },
-    { key: "team", label: "Equipe" },
+  const navSections: NavSection[] = [
+    {
+      items: [
+        { key: "operations", label: "Comandas", available: true },
+        { key: "production", label: "Produção", available: true },
+      ],
+    },
+    {
+      label: "Catálogo",
+      items: [{ key: "catalog", label: "Produtos e categorias", available: true }],
+    },
+    {
+      label: "Configurações",
+      items: [{ key: "team", label: "Equipe", available: true }],
+    },
+    {
+      label: "Em breve",
+      items: [
+        { key: "clients", label: "Clientes", available: false },
+        { key: "financial", label: "Financeiro", available: false },
+        { key: "reports", label: "Relatórios", available: false },
+      ],
+    },
   ];
 
   return (
-    <div className="flex flex-1 flex-col items-center">
-      <div className="bg-background/95 sticky top-0 z-10 flex w-full max-w-2xl flex-col gap-2 border-b border-neutral-200 px-4 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:border-none sm:bg-transparent sm:px-6 sm:pt-6">
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              className={cn(
-                "shrink-0 whitespace-nowrap",
-                buttonVariants({ variant: view === tab.key ? "default" : "outline", size: "sm" }),
-              )}
-              onClick={() => setView(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex justify-end">
-          <SignOutButton />
-        </div>
+    <AppShell
+      companyName={tenant.name}
+      unitName="Unidade Principal"
+      userName={session.data?.user?.name ?? session.data?.user?.email ?? "Usuário"}
+      sections={navSections}
+      activeKey={view}
+      onSelect={(key) => setView(key as View)}
+      userMenu={<SignOutButton />}
+    >
+      <div className="flex flex-1 flex-col items-center">
+        {view === "operations" && <OperationsBoard tenantId={tenant.id} />}
+        {view === "production" && <ProductionBoard />}
+        {view === "catalog" && (
+          <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
+        )}
+        {view === "team" && (
+          <div className="flex w-full max-w-2xl flex-col gap-8 px-6 py-10">
+            <RolesManager tenantId={tenant.id} />
+            <MembersManager tenantId={tenant.id} />
+          </div>
+        )}
       </div>
-      {view === "operations" && <OperationsBoard tenantId={tenant.id} />}
-      {view === "production" && <ProductionBoard />}
-      {view === "catalog" && (
-        <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
-      )}
-      {view === "team" && (
-        <div className="flex w-full max-w-2xl flex-col gap-8 px-6 py-10">
-          <RolesManager tenantId={tenant.id} />
-          <MembersManager tenantId={tenant.id} />
-        </div>
-      )}
-    </div>
+    </AppShell>
   );
 }

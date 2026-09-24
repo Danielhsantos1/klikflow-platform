@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #f7f7f5;
+  --surface: #ffffff;
   --foreground: #171717;
+  --muted: #6b6b64;
+  --border: #e4e3dd;
+
+  --brand: #0f6e4f;
+  --brand-foreground: #ffffff;
+  --brand-soft: #e3f2ea;
+
+  --accent: #2f5fa8;
+  --accent-foreground: #ffffff;
+  --accent-soft: #e7edf7;
+
+  --success: #0f6e4f;
+  --success-soft: #e3f2ea;
+  --warning: #b4650a;
+  --warning-soft: #fbead2;
+  --danger: #c62d2d;
+  --danger-soft: #fbe4e4;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #121312;
+    --surface: #1a1b19;
+    --foreground: #f0efec;
+    --muted: #a3a29b;
+    --border: #2d2e2a;
+
+    --brand: #3fbf8a;
+    --brand-soft: #14261d;
+    --accent: #7ba3e0;
+    --accent-soft: #1c2635;
+
+    --success: #3fbf8a;
+    --success-soft: #14261d;
+    --warning: #e0a83a;
+    --warning-soft: #3a2c12;
+    --danger: #e06a6a;
+    --danger-soft: #3a1c1c;
   }
+}
+
+* {
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }

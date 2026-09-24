@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
 
 export function SignupForm() {
   const router = useRouter();
@@ -79,7 +80,7 @@ export function SignupForm() {
           onChange={(event) => setPassword(event.target.value)}
         />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <Alert variant="danger">{error}</Alert>}
       <Button type="submit" disabled={loading}>
         {loading ? "Criando conta..." : "Criar conta"}
       </Button>

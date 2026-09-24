@@ -5,6 +5,8 @@ import { useState } from "react";
 import { createDbClient } from "@/lib/db/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
 import type { TenantSegment } from "@/types/database";
 
 const SEGMENTS: { value: TenantSegment; label: string }[] = [
@@ -49,40 +51,47 @@ export function CreateTenantForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-      <h2 className="text-lg font-semibold">Cadastre sua empresa</h2>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="tenant-name" className="text-sm font-medium">
-          Nome da empresa
-        </label>
-        <Input
-          id="tenant-name"
-          required
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="tenant-segment" className="text-sm font-medium">
-          Segmento
-        </label>
-        <select
-          id="tenant-segment"
-          className="h-10 rounded-md border border-neutral-200 bg-transparent px-3 text-sm"
-          value={segment}
-          onChange={(event) => setSegment(event.target.value as TenantSegment)}
-        >
-          {SEGMENTS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" disabled={loading}>
-        {loading ? "Criando..." : "Criar empresa"}
-      </Button>
-    </form>
+    <Card className="w-full max-w-sm">
+      <CardContent className="p-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1 text-center">
+            <h2 className="text-lg font-semibold">Cadastre sua empresa</h2>
+            <p className="text-sm text-muted">Leva menos de um minuto.</p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="tenant-name" className="text-sm font-medium">
+              Nome da empresa
+            </label>
+            <Input
+              id="tenant-name"
+              required
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="tenant-segment" className="text-sm font-medium">
+              Segmento
+            </label>
+            <select
+              id="tenant-segment"
+              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+              value={segment}
+              onChange={(event) => setSegment(event.target.value as TenantSegment)}
+            >
+              {SEGMENTS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {error && <Alert variant="danger">{error}</Alert>}
+          <Button type="submit" disabled={loading}>
+            {loading ? "Criando..." : "Criar empresa"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
