@@ -499,17 +499,22 @@ export interface Database {
           tab_id: string;
           status_id: string;
           created_by: string;
+          customer_name: string | null;
+          pickup_number: number | null;
           created_at: string;
           updated_at: string;
         };
         // status_id may be omitted: set_default_order_status() fills in
         // the tenant's lowest-`sequence` order_statuses row when absent.
+        // pickup_number is never set by the client — assign_pickup_number()
+        // (0018) fills it in when the order leaves `awaiting_payment`.
         Insert: {
           id?: string;
           tenant_id: string;
           tab_id: string;
           status_id?: string;
           created_by: string;
+          customer_name?: string | null;
           created_at?: string;
           updated_at?: string;
         };
