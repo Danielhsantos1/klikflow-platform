@@ -475,12 +475,22 @@ cardápio virou uma leitura `authenticated` daquele outro funcionário —
 e `is_tenant_member()` corretamente bloqueou, já que ele não pertence à
 Cafe Daniel.
 
-Corrigido: `src/lib/db/client.ts` ganhou `createAnonymousDbClient()`
-(`getToken` fixo em `async () => null`, nunca consulta
-`/api/session-token`), e é o único cliente que `CustomerOrderPage` usa
-agora. O canal de cliente nunca mais depende de qual conta de
-funcionário, se alguma, estiver logada no mesmo aparelho — inclusive
-quando é o próprio dono da empresa testando seu QR code.
+Primeira correção: `src/lib/db/client.ts` ganhou
+`createAnonymousDbClient()` (`getToken` fixo em `async () => null`,
+nunca consulta `/api/session-token`). Isso revelou um segundo
+problema, ainda em produção: o SDK (`@neondatabase/neon-js`, beta)
+lança `AuthRequiredError: Authentication required` assim que `getToken`
+resolve `null` — não existe forma suportada de fazer esse cliente pedir
+como o role `anonymous` da Data API, só como um usuário autenticado.
+
+Correção final: `src/lib/db/anonymous.ts` (`anonSelect`/`anonRpc`) —
+`fetch()` puro contra a Data API, sem nenhum header de Authorization,
+o mesmo mecanismo que `scripts/test-*.browser.js` usam desde a Tarefa
+02. `CustomerOrderPage` foi reescrita pra usar só essas duas funções,
+nunca `createDbClient()`/o SDK. `createAnonymousDbClient()` foi
+removida do código (não funcionava para o que foi criada) — o
+comentário em `src/lib/db/client.ts` documenta o porquê, pra ninguém
+tentar esse caminho de novo.
 
 - **Próximo**: nenhuma tarefa nova planejada além desta — a
   funcionalidade "Canais de Atendimento" está com seu núcleo completo

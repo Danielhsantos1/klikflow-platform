@@ -138,19 +138,24 @@
   cadastraram essa transição no grafo — tentar pular pra qualquer outro
   status continua bloqueado como qualquer transição não configurada.
 - **A tela do cliente nunca herda uma sessão de funcionário do mesmo
-  aparelho (achado real em produção, Tarefa 5/N)**: `createDbClient()`
-  (usado por toda tela logada) sempre injeta o JWT de quem estiver
-  logado no navegador via `/api/session-token` — inclusive sem querer,
-  se um funcionário abrir seu próprio link de QR/Totem pra testar
-  enquanto ainda está logado noutra empresa. Isso quebrou o cardápio
-  público em produção: o pedido de leitura foi avaliado como
-  `authenticated`, não `anonymous`, e o `is_tenant_member()` da outra
-  empresa bloqueou. `src/lib/db/client.ts` ganhou
-  `createAnonymousDbClient()` — `getToken` fixo em `async () => null`,
-  nunca lê `/api/session-token` — e é o único cliente que
-  `CustomerOrderPage` usa. O comportamento do canal de cliente agora
-  independe de qualquer sessão de staff que por acaso exista no mesmo
-  navegador.
+  aparelho, e nunca usa o SDK que exige sessão (dois achados reais em
+  produção, Tarefa 5/N)**: `createDbClient()` (usado por toda tela
+  logada) sempre injeta o JWT de quem estiver logado no navegador via
+  `/api/session-token` — inclusive sem querer, se um funcionário abrir
+  seu próprio link de QR/Totem enquanto ainda está logado noutra
+  empresa; foi assim que o cardápio público quebrou a primeira vez
+  (`is_tenant_member()` de outra empresa bloqueou a leitura). A
+  correção inicial (uma variante do mesmo cliente com `getToken` fixo
+  em `null`) revelou um segundo problema: o SDK (`@neondatabase/neon-js`,
+  beta) lança `AuthRequiredError` assim que `getToken` resolve `null`
+  — não existe forma suportada de fazer esse cliente pedir como o role
+  `anonymous` da Data API, só como um autenticado. `src/lib/db/anonymous.ts`
+  contorna isso com `fetch()` puro, sem nenhum header de Authorization
+  — o mesmo mecanismo que `scripts/test-*.browser.js` usam desde a
+  Tarefa 02 — e é o único jeito que `CustomerOrderPage` fala com a Data
+  API. O comportamento do canal de cliente agora independe de qualquer
+  sessão de staff no mesmo navegador e não depende de nenhum
+  comportamento do SDK além do `fetch()` do próprio navegador.
 
 - ~~Fluxo de autenticação completo (login/signup)~~ — **fechado na
   Tarefa 07**: UI real (`/login`, `/signup`, `/app`) sobre a

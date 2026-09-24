@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import { createAnonymousDbClient } from "@/lib/db/client";
+import { anonRpc, anonSelect } from "@/lib/db/anonymous";
 import { Button } from "@/components/ui/button";
 import type { Category, ConsumptionLocation, Product } from "@/types/catalog";
 import type { Tab } from "@/types/order";
+import type { Order, OrderItem } from "@/types/order";
 
 type CustomerChannel = "qr_code" | "totem";
 
@@ -22,6 +23,11 @@ function tokenStorageKey(locationId: string) {
  * `access_token` minted by `open_customer_tab()` and stored in
  * `localStorage` so reloading the page resumes the same cart instead of
  * opening a second tab for the location.
+ *
+ * Every request here goes through `anonSelect`/`anonRpc`
+ * (`src/lib/db/anonymous.ts`) — plain `fetch()`, no Authorization
+ * header — never `createDbClient()`, which always attaches whatever
+ * staff session cookie the browser happens to have.
  *
  * There is no payment step yet (a separate, not-yet-designed piece of
  * the platform) — every "Adicionar" writes the item to the real order
@@ -63,44 +69,38 @@ export function CustomerOrderPage({
     }
 
     async function loadImpl() {
-      const db = createAnonymousDbClient();
-
-      const locationRes = await db
-        .from("consumption_locations")
-        .select("*")
-        .eq("id", locationId)
-        .maybeSingle();
+      const locationRes = await anonSelect<ConsumptionLocation>(
+        "consumption_locations",
+        `id=eq.${locationId}&select=*&limit=1`,
+      );
 
       if (cancelled) return;
 
-      if (locationRes.error || !locationRes.data) {
-        setError(
-          locationRes.error
-            ? `Local não encontrado: ${locationRes.error.message}`
-            : "Local não encontrado.",
-        );
+      const foundLocation = locationRes.data[0];
+      if (locationRes.error || !foundLocation) {
+        setError(locationRes.error ?? "Local não encontrado.");
         setLoading(false);
         return;
       }
 
-      setLocation(locationRes.data);
+      setLocation(foundLocation);
 
       const storedToken = window.localStorage.getItem(tokenStorageKey(locationId));
       let currentTab: Tab | null = null;
 
       if (storedToken) {
-        const { data } = await db.rpc("get_customer_tab", { p_token: storedToken });
-        currentTab = data ?? null;
+        const { data } = await anonRpc<Tab>("get_customer_tab", { p_token: storedToken });
+        currentTab = data;
       }
 
       if (!currentTab) {
-        const { data, error: openError } = await db.rpc("open_customer_tab", {
+        const { data, error: openError } = await anonRpc<Tab>("open_customer_tab", {
           p_location_id: locationId,
           p_channel: channel,
         });
 
         if (openError || !data) {
-          setError(openError?.message ?? "Não foi possível iniciar seu pedido.");
+          setError(openError ?? "Não foi possível iniciar seu pedido.");
           setLoading(false);
           return;
         }
@@ -113,13 +113,19 @@ export function CustomerOrderPage({
       setTab(currentTab);
 
       const [categoriesRes, productsRes] = await Promise.all([
-        db.from("categories").select("*").eq("tenant_id", currentTab.tenant_id).order("name"),
-        db.from("products").select("*").eq("tenant_id", currentTab.tenant_id).order("name"),
+        anonSelect<Category>(
+          "categories",
+          `tenant_id=eq.${currentTab.tenant_id}&select=*&order=name.asc`,
+        ),
+        anonSelect<Product>(
+          "products",
+          `tenant_id=eq.${currentTab.tenant_id}&select=*&order=name.asc`,
+        ),
       ]);
 
       if (!cancelled) {
-        setCategories(categoriesRes.data ?? []);
-        setProducts(productsRes.data ?? []);
+        setCategories(categoriesRes.data);
+        setProducts(productsRes.data);
         setLoading(false);
       }
     }
@@ -135,16 +141,15 @@ export function CustomerOrderPage({
     if (!tab?.access_token) return;
     setError(null);
 
-    const db = createAnonymousDbClient();
     let currentOrderId = orderId;
 
     if (!currentOrderId) {
-      const { data, error: orderError } = await db.rpc("create_customer_order", {
+      const { data, error: orderError } = await anonRpc<Order>("create_customer_order", {
         p_token: tab.access_token,
       });
 
       if (orderError || !data) {
-        setError(orderError?.message ?? "Não foi possível criar o pedido.");
+        setError(orderError ?? "Não foi possível criar o pedido.");
         return;
       }
 
@@ -152,7 +157,7 @@ export function CustomerOrderPage({
       setOrderId(currentOrderId);
     }
 
-    const { data: item, error: itemError } = await db.rpc("add_customer_order_item", {
+    const { data: item, error: itemError } = await anonRpc<OrderItem>("add_customer_order_item", {
       p_token: tab.access_token,
       p_order_id: currentOrderId,
       p_product_id: product.id,
@@ -160,7 +165,7 @@ export function CustomerOrderPage({
     });
 
     if (itemError || !item) {
-      setError(itemError?.message ?? "Não foi possível adicionar o item.");
+      setError(itemError ?? "Não foi possível adicionar o item.");
       return;
     }
 

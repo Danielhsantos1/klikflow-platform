@@ -44,22 +44,11 @@ export function createDbClient() {
   });
 }
 
-/**
- * For public, no-login surfaces (`CustomerOrderPage` — Canais de
- * Atendimento). Never attaches a token, even if the same browser
- * happens to also have a staff session cookie (e.g. a manager opening
- * their own QR code link to demo it) — a customer's request must
- * always hit the Data API as the `anonymous` role, or RLS resolves
- * against whichever staff account is logged in on that device instead
- * of behaving the same for everyone.
- */
-export function createAnonymousDbClient() {
-  const { dataApi } = defaultDeriveNeonUrls(process.env.NEXT_PUBLIC_NEON_DATABASE_URL!);
-
-  return createClient<Database>({
-    dataApi: {
-      url: dataApi,
-      getToken: async () => null,
-    },
-  });
-}
+// For public, no-login surfaces (`CustomerOrderPage` — Canais de
+// Atendimento), see `src/lib/db/anonymous.ts` instead of this file.
+// This SDK's "external auth provider" form throws `AuthRequiredError`
+// the instant `getToken` resolves to `null` — there is no supported way
+// to make it request as the Data API's `anonymous` role, only ever as
+// an authenticated one. `anonymous.ts` bypasses the SDK entirely with a
+// bare `fetch()`, the same mechanism `scripts/test-*.browser.js` have
+// used since Task 02.
