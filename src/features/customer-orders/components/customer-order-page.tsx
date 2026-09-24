@@ -49,6 +49,7 @@ export function CustomerOrderPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [startedOrdering, setStartedOrdering] = useState(false);
+  const [finished, setFinished] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,6 +201,17 @@ export function CustomerOrderPage({
     );
   }
 
+  if (finished) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-2xl">Pedido enviado! ✅</p>
+        <p className="text-lg text-neutral-500">
+          Dirija-se ao balcão para pagar e retirar seu pedido.
+        </p>
+      </main>
+    );
+  }
+
   const uncategorized = products.filter((product) => !product.category_id);
   const cartTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 
@@ -270,14 +282,12 @@ export function CustomerOrderPage({
       )}
 
       {cart.length > 0 && (
-        <div className="bg-background sticky bottom-0 flex flex-col gap-1 border-t border-neutral-200 py-3">
+        <div className="bg-background sticky bottom-0 flex flex-col gap-2 border-t border-neutral-200 py-3">
           <p className="text-sm font-medium">
             Seu pedido: {cart.length} {cart.length === 1 ? "item" : "itens"} —{" "}
             {cartTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
           </p>
-          <p className="text-xs text-neutral-400">
-            Dirija-se ao balcão para pagar e confirmar seu pedido.
-          </p>
+          <Button onClick={() => setFinished(true)}>Finalizar pedido</Button>
         </div>
       )}
     </main>
