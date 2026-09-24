@@ -8,8 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TabPanel } from "@/features/tabs/components/tab-panel";
 import { TabHistory } from "@/features/tabs/components/tab-history";
+import { Badge } from "@/components/ui/badge";
 import type { Category, ConsumptionLocation, Product } from "@/types/catalog";
 import type { Tab } from "@/types/order";
+
+const CHANNEL_LABEL: Record<Tab["channel"], string> = {
+  staff: "Aberta pela equipe",
+  qr_code: "Aberta por cliente (QR Code)",
+  totem: "Aberta por cliente (Totem)",
+};
 
 type LocationWithTab = ConsumptionLocation & { openTab: Tab | null };
 
@@ -172,9 +179,16 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
         <h2 className="text-lg font-medium">Locais de consumo</h2>
         <ul className="flex flex-col gap-2">
           {locations.map((location) => (
-            <li key={location.id} className="rounded-md border border-neutral-200">
+            <li key={location.id} className="rounded-md border border-border">
               <div className="flex items-center justify-between px-3 py-2">
-                <span className="text-sm font-medium">{location.label}</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium">{location.label}</span>
+                  {location.openTab && (
+                    <Badge variant={location.openTab.channel === "staff" ? "neutral" : "accent"}>
+                      {CHANNEL_LABEL[location.openTab.channel]}
+                    </Badge>
+                  )}
+                </div>
                 {location.openTab ? (
                   <Button
                     variant="outline"
@@ -194,7 +208,7 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
                 )}
               </div>
               {location.openTab && expandedLocationId === location.id && (
-                <div className="border-t border-neutral-200 px-3 py-3">
+                <div className="border-t border-border px-3 py-3">
                   <TabPanel
                     tab={location.openTab}
                     products={products}

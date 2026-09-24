@@ -112,7 +112,10 @@ export function CustomerOrderPage({
         });
 
         if (openError || !data) {
-          setError(openError ?? "Não foi possível iniciar seu pedido.");
+          const friendlyError = openError?.includes("already has an open tab")
+            ? "Esta mesa já está em atendimento. Chame um atendente para continuar."
+            : (openError ?? "Não foi possível iniciar seu pedido.");
+          setError(friendlyError);
           setLoading(false);
           return;
         }
