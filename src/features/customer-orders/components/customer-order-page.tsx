@@ -19,6 +19,13 @@ function tokenStorageKey(locationId: string) {
   return `klikflow.customer_tab_token.${locationId}`;
 }
 
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 /**
  * The customer-facing ordering screen for the "Canais de Atendimento"
  * feature (QR Code / Totem — same component serves both, only the
@@ -196,7 +203,7 @@ export function CustomerOrderPage({
   if (!startedOrdering) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
-        <p className="text-2xl">Olá! 👋</p>
+        <p className="text-2xl">{greeting()}! 👋</p>
         <p className="text-lg text-muted">Como você deseja fazer seu pedido?</p>
         <Button size="lg" onClick={() => setStartedOrdering(true)}>
           Fazer meu pedido
@@ -231,28 +238,34 @@ export function CustomerOrderPage({
 
   return (
     <main className="flex flex-1 flex-col lg:flex-row">
-      <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-6">
-        <h1 className="text-xl font-semibold">{location?.label}</h1>
-        {error && <p className="text-sm text-danger">{error}</p>}
+      <div className="flex flex-1 flex-col gap-4 lg:overflow-y-auto">
+        <div className="flex flex-col gap-1 bg-foreground px-4 py-6 text-background sm:px-6">
+          <span className="text-sm font-medium opacity-80">{greeting()} 👋</span>
+          <h1 className="text-2xl font-bold tracking-tight">{location?.label}</h1>
+        </div>
 
-        <CategoryPills
-          categories={categories}
-          activeId={activeCategoryId}
-          onSelect={setActiveCategoryId}
-        />
+        <div className="flex flex-col gap-4 px-4 pb-6 sm:px-6">
+          {error && <p className="text-sm text-danger">{error}</p>}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {visibleProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              name={product.name}
-              price={Number(product.price)}
-              onAdd={() => handleAddToCart(product)}
-            />
-          ))}
-          {visibleProducts.length === 0 && (
-            <p className="col-span-full text-sm text-muted">Nenhum produto nesta categoria.</p>
-          )}
+          <CategoryPills
+            categories={categories}
+            activeId={activeCategoryId}
+            onSelect={setActiveCategoryId}
+          />
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {visibleProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                name={product.name}
+                price={Number(product.price)}
+                onAdd={() => handleAddToCart(product)}
+              />
+            ))}
+            {visibleProducts.length === 0 && (
+              <p className="col-span-full text-sm text-muted">Nenhum produto nesta categoria.</p>
+            )}
+          </div>
         </div>
       </div>
 
