@@ -87,3 +87,26 @@ export async function anonRpc<T>(
 
   return { data: first<T>(body), error: null };
 }
+
+/** Like `anonRpc`, but for a `returns table (...)` function — keeps every row. */
+export async function anonRpcList<T>(
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<{ data: T[]; error: string | null }> {
+  const token = await getAnonymousToken();
+  const response = await fetch(`${DATA_API_URL}/rpc/${fn}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(args),
+  });
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    return { data: [], error: (body as { message?: string })?.message ?? `HTTP ${response.status}` };
+  }
+
+  return { data: (Array.isArray(body) ? body : []) as T[], error: null };
+}

@@ -759,6 +759,16 @@ export interface Database {
         Args: { p_token: string; p_order_id: string };
         Returns: { status_key: string; status_label: string; pickup_number: number | null };
       };
+      list_ready_orders: {
+        Args: { p_tenant_id: string };
+        Returns: {
+          order_id: string;
+          pickup_number: number | null;
+          customer_name: string | null;
+          location_label: string;
+          ready_since: string;
+        }[];
+      };
     };
     Enums: Record<string, never>;
   };

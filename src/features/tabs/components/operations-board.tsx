@@ -73,7 +73,26 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [newLocationLabel, setNewLocationLabel] = useState("");
   const [expandedLocationId, setExpandedLocationId] = useState<string | null>(null);
+  const [linksLocationId, setLinksLocationId] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+
+  function customerLink(locationId: string, channel: "qr_code" | "totem") {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const suffix = channel === "totem" ? "?channel=totem" : "";
+    return `${origin}/pedir/${locationId}${suffix}`;
+  }
+
+  async function handleCopyLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedLink(link);
+      setTimeout(() => setCopiedLink((current) => (current === link ? null : current)), 2000);
+    } catch {
+      // Clipboard API pode falhar sem HTTPS/permissão — o link já fica
+      // visível na tela pra copiar manualmente.
+    }
+  }
 
   async function reload() {
     const result = await fetchBoard(tenantId);
@@ -189,24 +208,57 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
                     </Badge>
                   )}
                 </div>
-                {location.openTab ? (
+                <div className="flex gap-2">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={() =>
-                      setExpandedLocationId(
-                        expandedLocationId === location.id ? null : location.id,
-                      )
+                      setLinksLocationId(linksLocationId === location.id ? null : location.id)
                     }
                   >
-                    {expandedLocationId === location.id ? "Fechar" : "Ver comanda"}
+                    {linksLocationId === location.id ? "Fechar links" : "Link do cliente"}
                   </Button>
-                ) : (
-                  <Button size="sm" onClick={() => handleOpenTab(location.id)}>
-                    Abrir comanda
-                  </Button>
-                )}
+                  {location.openTab ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setExpandedLocationId(
+                          expandedLocationId === location.id ? null : location.id,
+                        )
+                      }
+                    >
+                      {expandedLocationId === location.id ? "Fechar" : "Ver comanda"}
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={() => handleOpenTab(location.id)}>
+                      Abrir comanda
+                    </Button>
+                  )}
+                </div>
               </div>
+              {linksLocationId === location.id && (
+                <div className="flex flex-col gap-2 border-t border-border px-3 py-3">
+                  {(["qr_code", "totem"] as const).map((channel) => {
+                    const link = customerLink(location.id, channel);
+                    return (
+                      <div key={channel} className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-muted">
+                          {channel === "qr_code" ? "QR Code" : "Totem"}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 truncate rounded bg-black/[0.04] px-2 py-1 text-xs dark:bg-white/[0.06]">
+                            {link}
+                          </code>
+                          <Button size="sm" variant="outline" onClick={() => handleCopyLink(link)}>
+                            {copiedLink === link ? "Copiado!" : "Copiar"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {location.openTab && expandedLocationId === location.id && (
                 <div className="border-t border-border px-3 py-3">
                   <TabPanel

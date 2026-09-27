@@ -147,7 +147,19 @@ export function TenantDashboard() {
       sections={navSections}
       activeKey={view}
       onSelect={(key) => setView(key as View)}
-      userMenu={<SignOutButton />}
+      userMenu={
+        <div className="flex items-center gap-2">
+          <a
+            href={`/painel/${tenant.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="hidden text-sm text-muted underline underline-offset-4 hover:text-foreground sm:inline"
+          >
+            Painel TV
+          </a>
+          <SignOutButton />
+        </div>
+      }
     >
       <div className="flex flex-1 flex-col items-center">
         {view === "operations" && <OperationsBoard tenantId={tenant.id} />}
