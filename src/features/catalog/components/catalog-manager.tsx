@@ -42,6 +42,7 @@ export function CatalogManager({
 
   const [categoryName, setCategoryName] = useState("");
   const [productName, setProductName] = useState("");
+  const [productDescription, setProductDescription] = useState("");
   const [productPrice, setProductPrice] = useState("");
   const [productCategoryId, setProductCategoryId] = useState("");
   const [stationName, setStationName] = useState("");
@@ -114,6 +115,7 @@ export function CatalogManager({
     const { error: insertError } = await db.from("products").insert({
       tenant_id: tenantId,
       name: productName,
+      description: productDescription || null,
       price,
       category_id: productCategoryId || null,
     });
@@ -124,6 +126,7 @@ export function CatalogManager({
     }
 
     setProductName("");
+    setProductDescription("");
     setProductPrice("");
     setProductCategoryId("");
     await reload();
@@ -268,6 +271,9 @@ export function CatalogManager({
                     })}
                   </span>
                 </div>
+                {product.description && (
+                  <p className="text-xs italic text-muted">{product.description}</p>
+                )}
                 {linkedStation ? (
                   <span className="text-xs text-neutral-400">
                     Estação: {linkedStation} (precisa de preparo)
@@ -289,35 +295,41 @@ export function CatalogManager({
             <li className="text-sm text-neutral-400">Nenhum produto ainda.</li>
           )}
         </ul>
-        <form
-          onSubmit={handleCreateProduct}
-          className="flex flex-col gap-2 sm:flex-row"
-        >
+        <form onSubmit={handleCreateProduct} className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              placeholder="Nome do produto"
+              value={productName}
+              onChange={(event) => setProductName(event.target.value)}
+              required
+            />
+          </div>
           <Input
-            placeholder="Nome do produto"
-            value={productName}
-            onChange={(event) => setProductName(event.target.value)}
-            required
+            placeholder="Descrição (opcional, ex: Grãos 100% arábica, torra média)"
+            value={productDescription}
+            onChange={(event) => setProductDescription(event.target.value)}
           />
-          <Input
-            placeholder="Preço (ex: 25,90)"
-            value={productPrice}
-            onChange={(event) => setProductPrice(event.target.value)}
-            required
-          />
-          <select
-            className="h-10 rounded-md border border-neutral-200 bg-transparent px-3 text-sm"
-            value={productCategoryId}
-            onChange={(event) => setProductCategoryId(event.target.value)}
-          >
-            <option value="">Sem categoria</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <Button type="submit">Adicionar</Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              placeholder="Preço (ex: 25,90)"
+              value={productPrice}
+              onChange={(event) => setProductPrice(event.target.value)}
+              required
+            />
+            <select
+              className="h-10 rounded-md border border-neutral-200 bg-transparent px-3 text-sm"
+              value={productCategoryId}
+              onChange={(event) => setProductCategoryId(event.target.value)}
+            >
+              <option value="">Sem categoria</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <Button type="submit">Adicionar</Button>
+          </div>
         </form>
       </section>
     </div>

@@ -1,17 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Playfair_Display } from "next/font/google";
 
 import { anonRpc, anonSelect } from "@/lib/db/anonymous";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CategoryPills } from "@/components/pos/category-pills";
-import { ProductCard } from "@/components/pos/product-card";
 import { CartPanel, type CartLine } from "@/components/pos/cart-panel";
 import { brandStyleVars } from "@/lib/theme/brand-style";
 import type { Category, ConsumptionLocation, Product } from "@/types/catalog";
 import type { Tab } from "@/types/order";
 import type { Order, OrderItem } from "@/types/order";
+
+const playfair = Playfair_Display({ subsets: ["latin"], weight: ["700"] });
+
+function formatBRL(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 type CustomerChannel = "qr_code" | "totem";
 
@@ -96,7 +101,6 @@ export function CustomerOrderPage({
   const [finished, setFinished] = useState(false);
   const [pickupNumber, setPickupNumber] = useState<number | null>(null);
   const [orderStatusKey, setOrderStatusKey] = useState<string | null>(null);
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [brandColor, setBrandColor] = useState<string | null>(null);
 
   const accessToken = tab?.access_token ?? null;
@@ -399,9 +403,18 @@ export function CustomerOrderPage({
     );
   }
 
-  const visibleProducts = activeCategoryId
-    ? products.filter((product) => product.category_id === activeCategoryId)
-    : products;
+  const sections = [
+    ...categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      products: products.filter((product) => product.category_id === category.id),
+    })),
+    {
+      id: "uncategorized",
+      name: "Outros",
+      products: products.filter((product) => !product.category_id),
+    },
+  ].filter((section) => section.products.length > 0);
 
   const cartLines: CartLine[] = Object.values(
     cart.reduce<Record<string, CartLine>>((lines, item) => {
@@ -415,39 +428,65 @@ export function CustomerOrderPage({
   );
 
   return (
-    <main className="flex flex-1 flex-col lg:flex-row" style={brandStyleVars(brandColor)}>
-      <div className="flex flex-1 flex-col gap-4 lg:overflow-y-auto">
-        <div className="flex flex-col gap-1 bg-foreground px-4 py-6 text-background sm:px-6">
-          <span className="text-sm font-medium opacity-80">{greeting()} 👋</span>
-          <h1 className="text-2xl font-bold tracking-tight">{location?.label}</h1>
-        </div>
+    <main
+      className="flex flex-1 flex-col bg-[#F9F6F0] text-[#1A1A1A] lg:flex-row"
+      style={brandStyleVars(brandColor)}
+    >
+      <div className="flex flex-1 flex-col lg:overflow-y-auto">
+        <header className="flex flex-col items-center gap-1 p-6 text-center md:p-12 md:pb-6">
+          <h1
+            className={`${playfair.className} text-3xl uppercase tracking-[0.2em] text-brand md:text-4xl`}
+          >
+            {location?.label ?? "Cardápio"}
+          </h1>
+          <p className="text-xs uppercase tracking-widest text-[#666666]">{greeting()}</p>
+        </header>
 
-        <div className="flex flex-col gap-4 px-4 pb-6 sm:px-6">
+        <div className="flex flex-col gap-8 px-6 pb-6 md:px-12 md:pb-12">
           {error && <p className="text-sm text-danger">{error}</p>}
 
-          <CategoryPills
-            categories={categories}
-            activeId={activeCategoryId}
-            onSelect={setActiveCategoryId}
-          />
+          {sections.map((section) => (
+            <section key={section.id} className="flex flex-col gap-4">
+              <h2 className="font-sans text-sm font-bold uppercase tracking-wider text-brand">
+                {section.name}
+              </h2>
+              <div className="grid grid-cols-1 gap-x-12 gap-y-6 md:grid-cols-2">
+                {section.products.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => handleAddToCart(product)}
+                    className="flex flex-col text-left"
+                  >
+                    <div className="flex items-end">
+                      <span className="font-sans text-sm font-bold uppercase md:text-base">
+                        {product.name}
+                      </span>
+                      <span className="mx-2 mb-1 flex-grow self-end border-b border-dotted border-gray-400" />
+                      <span className="font-sans font-bold">
+                        {formatBRL(Number(product.price))}
+                      </span>
+                      <span className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand text-xs text-brand">
+                        +
+                      </span>
+                    </div>
+                    {product.description && (
+                      <p className="mt-1 font-serif text-xs italic text-[#666666] md:text-sm">
+                        {product.description}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {visibleProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                name={product.name}
-                price={Number(product.price)}
-                onAdd={() => handleAddToCart(product)}
-              />
-            ))}
-            {visibleProducts.length === 0 && (
-              <p className="col-span-full text-sm text-muted">Nenhum produto nesta categoria.</p>
-            )}
-          </div>
+          {sections.length === 0 && (
+            <p className="text-sm text-[#666666]">Nenhum produto cadastrado ainda.</p>
+          )}
         </div>
       </div>
 
-      <aside className="border-t border-border bg-surface px-4 py-4 sm:px-6 lg:sticky lg:top-0 lg:h-screen lg:w-80 lg:shrink-0 lg:border-t-0 lg:border-l">
+      <aside className="border-t border-brand/20 bg-[#F9F6F0] px-4 py-4 sm:px-6 lg:sticky lg:top-0 lg:h-screen lg:w-80 lg:shrink-0 lg:border-t-0 lg:border-l">
         <CartPanel
           title="Seu pedido"
           lines={cartLines}
