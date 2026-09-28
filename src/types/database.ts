@@ -107,6 +107,7 @@ export interface Database {
           segment: TenantSegment;
           status: TenantStatus;
           brand_color: string | null;
+          logo_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -118,6 +119,7 @@ export interface Database {
           segment?: TenantSegment;
           status?: TenantStatus;
           brand_color?: string | null;
+          logo_url?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -274,6 +276,7 @@ export interface Database {
           id: string;
           tenant_id: string;
           name: string;
+          image_url: string | null;
           status: CatalogStatus;
           created_at: string;
           updated_at: string;
@@ -282,12 +285,14 @@ export interface Database {
           id?: string;
           tenant_id: string;
           name: string;
+          image_url?: string | null;
           status?: CatalogStatus;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           name?: string;
+          image_url?: string | null;
           status?: CatalogStatus;
           updated_at?: string;
         };

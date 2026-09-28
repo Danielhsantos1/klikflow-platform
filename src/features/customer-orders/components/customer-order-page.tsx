@@ -102,6 +102,7 @@ export function CustomerOrderPage({
   const [pickupNumber, setPickupNumber] = useState<number | null>(null);
   const [orderStatusKey, setOrderStatusKey] = useState<string | null>(null);
   const [brandColor, setBrandColor] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
 
@@ -213,13 +214,16 @@ export function CustomerOrderPage({
           "products",
           `tenant_id=eq.${currentTab.tenant_id}&select=*&order=name.asc`,
         ),
-        anonSelect<{ brand_color: string | null }>(
+        anonSelect<{ brand_color: string | null; logo_url: string | null }>(
           "tenants",
-          `id=eq.${currentTab.tenant_id}&select=brand_color&limit=1`,
+          `id=eq.${currentTab.tenant_id}&select=brand_color,logo_url&limit=1`,
         ),
       ]);
 
-      if (!cancelled) setBrandColor(tenantRes.data[0]?.brand_color ?? null);
+      if (!cancelled) {
+        setBrandColor(tenantRes.data[0]?.brand_color ?? null);
+        setLogoUrl(tenantRes.data[0]?.logo_url ?? null);
+      }
 
       if (!cancelled) {
         setCategories(categoriesRes.data);
@@ -464,14 +468,18 @@ export function CustomerOrderPage({
     ...categories.map((category) => ({
       id: category.id,
       name: category.name,
+      imageUrl: category.image_url,
       products: products.filter((product) => product.category_id === category.id),
     })),
     {
       id: "uncategorized",
       name: "Outros",
+      imageUrl: null as string | null,
       products: products.filter((product) => !product.category_id),
     },
   ].filter((section) => section.products.length > 0);
+
+  const CATEGORY_CARD_COLORS = ["#FBD8E0", "#E4D9F7", "#D6EAF8", "#FDEBD0", "#D5F5E3"];
 
   const cartLines: CartLine[] = Object.values(
     cart.reduce<Record<string, CartLine>>((lines, item) => {
@@ -500,24 +508,29 @@ export function CustomerOrderPage({
       style={brandStyleVars(brandColor)}
     >
       <div className="flex flex-col items-center gap-2 px-6 pb-4 pt-8 text-center">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="28"
-          height="28"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-brand"
-        >
-          <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
-          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
-          <line x1="6" x2="6" y1="2" y2="4" />
-          <line x1="10" x2="10" y1="2" y2="4" />
-          <line x1="14" x2="14" y1="2" y2="4" />
-        </svg>
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external Blob URL
+          <img src={logoUrl} alt="" className="h-14 w-14 rounded-full object-cover" />
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-brand"
+          >
+            <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+            <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+            <line x1="6" x2="6" y1="2" y2="4" />
+            <line x1="10" x2="10" y1="2" y2="4" />
+            <line x1="14" x2="14" y1="2" y2="4" />
+          </svg>
+        )}
         <h1
           className={`${playfair.className} border-y border-brand/30 px-4 py-2 text-2xl uppercase tracking-[0.2em] text-brand`}
         >
@@ -529,20 +542,46 @@ export function CustomerOrderPage({
       {error && <p className="px-6 text-sm text-danger">{error}</p>}
 
       {sections.length > 1 && (
-        <div className="sticky top-0 z-10 flex gap-2 overflow-x-auto border-b border-brand/15 bg-[#F9F6F0]/95 px-4 py-3 backdrop-blur">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => scrollToSection(section.id)}
-              className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
-                activeSectionId === section.id
-                  ? "border-brand bg-brand text-brand-foreground"
-                  : "border-brand/30 text-brand"
-              }`}
-            >
-              {section.name}
-            </button>
-          ))}
+        <div className="sticky top-0 z-10 flex gap-3 overflow-x-auto bg-[#F9F6F0]/95 px-4 py-3 backdrop-blur">
+          {sections.map((section, index) => {
+            const isActive = activeSectionId === section.id;
+            const cardColor = CATEGORY_CARD_COLORS[index % CATEGORY_CARD_COLORS.length];
+
+            return (
+              <button
+                key={section.id}
+                onClick={() => scrollToSection(section.id)}
+                className={`flex shrink-0 flex-col items-center gap-1.5 transition-opacity ${
+                  isActive ? "opacity-100" : "opacity-70"
+                }`}
+              >
+                <div
+                  className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl"
+                  style={{
+                    backgroundColor: section.imageUrl ? "transparent" : cardColor,
+                    outline: isActive ? "2px solid var(--brand)" : undefined,
+                    outlineOffset: "2px",
+                  }}
+                >
+                  {section.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external Blob URL
+                    <img
+                      src={section.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xl font-bold text-[#5c3a21]">
+                      {section.name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-[#1A1A1A]">
+                  {section.name}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 

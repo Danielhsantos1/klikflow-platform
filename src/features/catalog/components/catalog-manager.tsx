@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { createDbClient } from "@/lib/db/client";
+import { uploadImage } from "@/lib/uploads/upload-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Category, Product, ProductionStation } from "@/types/catalog";
@@ -150,6 +151,28 @@ export function CatalogManager({
     await reload();
   }
 
+  async function handleUploadCategoryIcon(categoryId: string, file: File) {
+    setError(null);
+
+    try {
+      const url = await uploadImage(file);
+      const db = createDbClient();
+      const { error: updateError } = await db
+        .from("categories")
+        .update({ image_url: url })
+        .eq("id", categoryId);
+
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+
+      await reload();
+    } catch (thrown) {
+      setError(thrown instanceof Error ? thrown.message : "Falha no upload.");
+    }
+  }
+
   async function handleLinkStation(productId: string, stationId: string) {
     setError(null);
 
@@ -183,13 +206,38 @@ export function CatalogManager({
             produtos, pra já poder escolher a categoria deles.
           </p>
         </div>
-        <ul className="flex flex-wrap gap-2">
+        <ul className="flex flex-wrap gap-3">
           {categories.map((category) => (
             <li
               key={category.id}
-              className="rounded-full border border-neutral-200 px-3 py-1 text-sm"
+              className="flex flex-col items-center gap-1.5 rounded-lg border border-neutral-200 p-2 text-sm"
             >
-              {category.name}
+              {category.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element -- external Blob URL, no next/image domain config needed for a preview
+                <img
+                  src={category.image_url}
+                  alt={category.name}
+                  className="h-14 w-14 rounded-md object-cover"
+                />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-md bg-brand-soft text-lg font-bold text-brand">
+                  {category.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span>{category.name}</span>
+              <label className="cursor-pointer text-xs text-brand underline underline-offset-2">
+                {category.image_url ? "Trocar ícone" : "Adicionar ícone"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) handleUploadCategoryIcon(category.id, file);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
             </li>
           ))}
           {categories.length === 0 && (

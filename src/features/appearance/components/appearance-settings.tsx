@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { createDbClient } from "@/lib/db/client";
+import { uploadImage } from "@/lib/uploads/upload-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
@@ -14,15 +15,45 @@ const DEFAULT_BRAND = "#0f6e4f";
 export function AppearanceSettings({
   tenantId,
   currentColor,
+  currentLogoUrl,
   onChanged,
+  onLogoChanged,
 }: {
   tenantId: string;
   currentColor: string | null;
+  currentLogoUrl: string | null;
   onChanged: (color: string | null) => void;
+  onLogoChanged: (logoUrl: string | null) => void;
 }) {
   const [color, setColor] = useState(currentColor ?? DEFAULT_BRAND);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function handleUploadLogo(file: File) {
+    setError(null);
+    setUploadingLogo(true);
+
+    try {
+      const url = await uploadImage(file);
+      const db = createDbClient();
+      const { error: updateError } = await db
+        .from("tenants")
+        .update({ logo_url: url })
+        .eq("id", tenantId);
+
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+
+      onLogoChanged(url);
+    } catch (thrown) {
+      setError(thrown instanceof Error ? thrown.message : "Falha no upload.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
 
   async function handleSave() {
     if (!HEX_PATTERN.test(color)) {
@@ -79,6 +110,39 @@ export function AppearanceSettings({
           cliente (QR Code/Totem). Clique “Usar padrão” pra manter o verde do KlikFlow.
         </p>
       </div>
+
+      <Card className="w-full max-w-sm">
+        <CardContent className="flex flex-col gap-4 p-6">
+          <div className="flex items-center gap-3">
+            {currentLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- external Blob URL
+              <img
+                src={currentLogoUrl}
+                alt="Logo"
+                className="h-16 w-16 rounded-lg border border-border object-cover"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted">
+                Sem logo
+              </div>
+            )}
+            <label className="cursor-pointer text-sm text-brand underline underline-offset-2">
+              {uploadingLogo ? "Enviando..." : currentLogoUrl ? "Trocar logo" : "Enviar logo"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingLogo}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) handleUploadLogo(file);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="w-full max-w-sm">
         <CardContent className="flex flex-col gap-4 p-6">

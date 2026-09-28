@@ -18,7 +18,7 @@ import { AppShell, type NavSection } from "@/components/layout/app-shell";
 import { AppearanceSettings } from "@/features/appearance/components/appearance-settings";
 import { brandStyleVars } from "@/lib/theme/brand-style";
 
-type ActiveTenant = { id: string; name: string; brandColor: string | null };
+type ActiveTenant = { id: string; name: string; brandColor: string | null; logoUrl: string | null };
 type View = "operations" | "production" | "catalog" | "team" | "appearance";
 
 const STUCK_TIMEOUT_MS = 8000;
@@ -50,7 +50,7 @@ export function TenantDashboard() {
         const db = createDbClient();
         const { data, error: fetchError } = await db
           .from("memberships")
-          .select("tenant_id, tenants(name, brand_color)")
+          .select("tenant_id, tenants(name, brand_color, logo_url)")
           .eq("user_id", userId!)
           .eq("status", "active")
           .limit(1)
@@ -64,11 +64,13 @@ export function TenantDashboard() {
           const tenantRow = data.tenants as unknown as {
             name: string;
             brand_color: string | null;
+            logo_url: string | null;
           } | null;
           setTenant({
             id: data.tenant_id,
             name: tenantRow?.name ?? "",
             brandColor: tenantRow?.brand_color ?? null,
+            logoUrl: tenantRow?.logo_url ?? null,
           });
         }
       } catch (thrown) {
@@ -118,7 +120,9 @@ export function TenantDashboard() {
   if (!tenant) {
     return (
       <div className="flex flex-col items-center gap-6 px-6 py-16">
-        <CreateTenantForm onCreated={(created) => setTenant({ ...created, brandColor: null })} />
+        <CreateTenantForm
+          onCreated={(created) => setTenant({ ...created, brandColor: null, logoUrl: null })}
+        />
       </div>
     );
   }
@@ -190,7 +194,9 @@ export function TenantDashboard() {
           <AppearanceSettings
             tenantId={tenant.id}
             currentColor={tenant.brandColor}
+            currentLogoUrl={tenant.logoUrl}
             onChanged={(brandColor) => setTenant((current) => current && { ...current, brandColor })}
+            onLogoChanged={(logoUrl) => setTenant((current) => current && { ...current, logoUrl })}
           />
         )}
       </div>
