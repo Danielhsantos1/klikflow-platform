@@ -131,7 +131,13 @@ export function MembersManager({ tenantId }: { tenantId: string }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-medium">Membros</h2>
+      <div>
+        <h2 className="text-lg font-medium">Membros</h2>
+        <p className="text-sm text-muted">
+          Pessoas com acesso a essa empresa. Troque o perfil de alguém ou suspenda o acesso sem
+          precisar apagar a conta.
+        </p>
+      </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <ul className="flex flex-col gap-2">
         {memberships.map((membership) => (

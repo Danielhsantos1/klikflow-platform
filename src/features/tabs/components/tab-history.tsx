@@ -79,7 +79,12 @@ export function TabHistory({ tenantId }: { tenantId: string }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-medium">Histórico</h2>
+      <div>
+        <h2 className="text-lg font-medium">Histórico</h2>
+        <p className="text-sm text-muted">
+          Comandas já fechadas — clique numa linha pra ver os itens e o total pago.
+        </p>
+      </div>
       <ul className="flex flex-col gap-2">
         {tabs.map((tab) => {
           const isExpanded = expandedTabId === tab.id;

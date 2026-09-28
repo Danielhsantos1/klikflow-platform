@@ -109,6 +109,14 @@ export function ProductionBoard() {
 
   return (
     <div className="flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Produção</h1>
+        <p className="text-sm text-muted">
+          Só aparece aqui item de pedido já pago, agrupado por estação. “Iniciar” marca que
+          começou o preparo; “Concluir” avança o item — quando todos os itens de um pedido ficam
+          concluídos, ele vira “Pronto” sozinho e aparece no Painel TV.
+        </p>
+      </div>
       {error && <p className="text-sm text-danger">{error}</p>}
 
       {[...byStation.entries()].map(([stationName, stationItems]) => (

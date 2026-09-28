@@ -120,7 +120,11 @@ export function TabPanel({
         />
       ))}
 
-      {orders.length === 0 && <p className="text-sm text-muted">Nenhum pedido nesta comanda ainda.</p>}
+      {orders.length === 0 && (
+        <p className="text-sm text-muted">
+          Nenhum pedido nesta comanda ainda. Clique “Novo pedido” pra começar a lançar itens.
+        </p>
+      )}
 
       <div className="flex items-center justify-between border-t border-border pt-3">
         <span className="text-sm font-semibold">
@@ -246,6 +250,12 @@ function OrderCard({
           )}
         </div>
       </div>
+      {order.order_statuses?.key === "awaiting_payment" && (
+        <p className="mb-2 text-xs text-muted">
+          Cliente lançou esse pedido pelo QR Code/Totem e ainda não pagou — clique “Confirmar
+          pagamento” quando ele pagar no balcão pra liberar pra produção.
+        </p>
+      )}
       <ul className="flex flex-col gap-1">
         {order.items.map((item) => (
           <li key={item.id} className="flex items-center justify-between gap-2 text-sm">

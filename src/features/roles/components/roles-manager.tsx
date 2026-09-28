@@ -118,7 +118,14 @@ export function RolesManager({ tenantId }: { tenantId: string }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-medium">Perfis</h2>
+      <div>
+        <h2 className="text-lg font-medium">Perfis</h2>
+        <p className="text-sm text-muted">
+          Cada empresa define seus próprios cargos (ex: Garçom, Caixa) e o que cada um pode fazer.
+          Clique num perfil pra marcar/desmarcar permissões. O perfil “(padrão)” é o dono — sempre
+          tem acesso total e não pode ser apagado.
+        </p>
+      </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <ul className="flex flex-col gap-2">
         {roles.map((role) => {

@@ -195,7 +195,14 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Locais de consumo</h2>
+        <div>
+          <h2 className="text-lg font-medium">Locais de consumo</h2>
+          <p className="text-sm text-muted">
+            Mesas ou balcões da sua loja. “Abrir comanda” começa um atendimento — lançado pela
+            equipe direto aqui, ou pelo cliente via “Link do cliente” (QR Code/Totem). Só uma
+            comanda aberta por local de cada vez.
+          </p>
+        </div>
         <ul className="flex flex-col gap-2">
           {locations.map((location) => (
             <li key={location.id} className="rounded-md border border-border">

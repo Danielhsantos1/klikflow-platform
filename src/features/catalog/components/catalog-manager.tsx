@@ -173,7 +173,13 @@ export function CatalogManager({
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Categorias</h2>
+        <div>
+          <h2 className="text-lg font-medium">Categorias</h2>
+          <p className="text-sm text-muted">
+            Agrupam os produtos no cardápio (ex: Bebidas, Salgados). Crie aqui antes de cadastrar
+            produtos, pra já poder escolher a categoria deles.
+          </p>
+        </div>
         <ul className="flex flex-wrap gap-2">
           {categories.map((category) => (
             <li
@@ -199,7 +205,14 @@ export function CatalogManager({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Estações de produção</h2>
+        <div>
+          <h2 className="text-lg font-medium">Estações de produção</h2>
+          <p className="text-sm text-muted">
+            Onde um produto é preparado (ex: Cozinha, Balcão de Café). Um produto vinculado a uma
+            estação entra na fila da aba Produção depois de pago; um produto sem estação (já
+            pronto, como uma lata de refrigerante) vai direto pra entrega, sem passar pela fila.
+          </p>
+        </div>
         <ul className="flex flex-wrap gap-2">
           {stations.map((station) => (
             <li
@@ -225,7 +238,14 @@ export function CatalogManager({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Produtos</h2>
+        <div>
+          <h2 className="text-lg font-medium">Produtos</h2>
+          <p className="text-sm text-muted">
+            O que aparece pra equipe lançar na comanda e pro cliente pedir pelo QR Code/Totem. Se
+            o produto precisa ser preparado, vincule a uma estação (abaixo do nome) — senão ele
+            vai direto pra entrega sem passar pela Produção.
+          </p>
+        </div>
         <ul className="flex flex-col gap-2">
           {products.map((product) => {
             const linkedStation = product.product_stations[0]?.production_stations?.name;
@@ -250,15 +270,17 @@ export function CatalogManager({
                 </div>
                 {linkedStation ? (
                   <span className="text-xs text-neutral-400">
-                    Estação: {linkedStation}
+                    Estação: {linkedStation} (precisa de preparo)
                   </span>
+                ) : stations.length > 0 ? (
+                  <StationLinkForm
+                    stations={stations}
+                    onLink={(stationId) => handleLinkStation(product.id, stationId)}
+                  />
                 ) : (
-                  stations.length > 0 && (
-                    <StationLinkForm
-                      stations={stations}
-                      onLink={(stationId) => handleLinkStation(product.id, stationId)}
-                    />
-                  )
+                  <span className="text-xs text-neutral-400">
+                    Sem estação — já pronto, vai direto pra entrega.
+                  </span>
                 )}
               </li>
             );
