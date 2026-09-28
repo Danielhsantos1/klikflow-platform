@@ -479,7 +479,6 @@ export function CustomerOrderPage({
     },
   ].filter((section) => section.products.length > 0);
 
-  const CATEGORY_CARD_COLORS = ["#FBD8E0", "#E4D9F7", "#D6EAF8", "#FDEBD0", "#D5F5E3"];
 
   const cartLines: CartLine[] = Object.values(
     cart.reduce<Record<string, CartLine>>((lines, item) => {
@@ -542,23 +541,21 @@ export function CustomerOrderPage({
       {error && <p className="px-6 text-sm text-danger">{error}</p>}
 
       {sections.length > 1 && (
-        <div className="sticky top-0 z-10 flex gap-3 overflow-x-auto bg-[#F9F6F0]/95 px-4 py-3 backdrop-blur">
-          {sections.map((section, index) => {
+        <div
+          className="sticky top-0 z-10 flex gap-4 overflow-x-auto bg-[#F9F6F0]/95 px-4 py-3 backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {sections.map((section) => {
             const isActive = activeSectionId === section.id;
-            const cardColor = CATEGORY_CARD_COLORS[index % CATEGORY_CARD_COLORS.length];
 
             return (
               <button
                 key={section.id}
                 onClick={() => scrollToSection(section.id)}
-                className={`flex shrink-0 flex-col items-center gap-1.5 transition-opacity ${
-                  isActive ? "opacity-100" : "opacity-70"
-                }`}
+                className="flex min-w-[80px] shrink-0 flex-col items-center text-center"
               >
                 <div
-                  className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl"
+                  className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-[#f5f5f5]"
                   style={{
-                    backgroundColor: section.imageUrl ? "transparent" : cardColor,
                     outline: isActive ? "2px solid var(--brand)" : undefined,
                     outlineOffset: "2px",
                   }}
@@ -571,12 +568,12 @@ export function CustomerOrderPage({
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <span className="text-xl font-bold text-[#5c3a21]">
+                    <span className="text-2xl font-bold text-[#3e2723]">
                       {section.name.charAt(0).toUpperCase()}
                     </span>
                   )}
                 </div>
-                <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-[#1A1A1A]">
+                <span className="mt-1.5 block whitespace-nowrap text-[13px] font-semibold text-[#3e2723]">
                   {section.name}
                 </span>
               </button>
