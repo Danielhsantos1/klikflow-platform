@@ -6,6 +6,7 @@ import { authClient } from "@/lib/auth/client";
 import { createDbClient } from "@/lib/db/client";
 import { CreateTenantForm } from "@/features/tenants/components/create-tenant-form";
 import { CatalogManager } from "@/features/catalog/components/catalog-manager";
+import { CustomerOrderPage } from "@/features/customer-orders/components/customer-order-page";
 import { OperationsBoard } from "@/features/tabs/components/operations-board";
 import { TabHistory } from "@/features/tabs/components/tab-history";
 import { ProductionBoard } from "@/features/production/components/production-board";
@@ -20,7 +21,7 @@ import { AppearanceSettings } from "@/features/appearance/components/appearance-
 import { brandStyleVars } from "@/lib/theme/brand-style";
 
 type ActiveTenant = { id: string; name: string; brandColor: string | null; logoUrl: string | null };
-type View = "operations" | "production" | "history" | "catalog" | "team" | "appearance";
+type View = "operations" | "production" | "history" | "catalog" | "menu-preview" | "team" | "appearance";
 
 const STUCK_TIMEOUT_MS = 8000;
 
@@ -138,7 +139,10 @@ export function TenantDashboard() {
     },
     {
       label: "Catálogo",
-      items: [{ key: "catalog", label: "Produtos e categorias", available: true }],
+      items: [
+        { key: "catalog", label: "Produtos e categorias", available: true },
+        { key: "menu-preview", label: "Ver cardápio do cliente", available: true },
+      ],
     },
     {
       label: "Configurações",
@@ -186,6 +190,11 @@ export function TenantDashboard() {
         {view === "history" && <TabHistory tenantId={tenant.id} />}
         {view === "catalog" && (
           <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
+        )}
+        {view === "menu-preview" && (
+          <div className="w-full">
+            <CustomerOrderPage mode="preview" tenantId={tenant.id} />
+          </div>
         )}
         {view === "team" && (
           <div className="flex w-full max-w-2xl flex-col gap-8 px-6 py-10">

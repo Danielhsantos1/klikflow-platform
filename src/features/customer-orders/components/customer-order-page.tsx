@@ -79,14 +79,18 @@ function playReadyChime() {
  * `awaiting_payment`, which is what actually releases it to the
  * kitchen/production board (Etapa 1/N do fluxo Totem/Tablet com senha).
  */
-export function CustomerOrderPage({
-  locationId,
-  channel,
-}: {
-  locationId: string;
-  channel: CustomerChannel;
-}) {
+type CustomerOrderPageProps =
+  | { mode?: "customer"; locationId: string; channel: CustomerChannel }
+  | { mode: "preview"; tenantId: string };
+
+export function CustomerOrderPage(props: CustomerOrderPageProps) {
+  const isPreview = props.mode === "preview";
+  const locationId = props.mode === "preview" ? null : props.locationId;
+  const channel = props.mode === "preview" ? null : props.channel;
+  const previewTenantId = props.mode === "preview" ? props.tenantId : null;
+
   const [location, setLocation] = useState<ConsumptionLocation | null>(null);
+  const [tenantName, setTenantName] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -159,68 +163,72 @@ export function CustomerOrderPage({
     }
 
     async function loadImpl() {
-      const locationRes = await anonSelect<ConsumptionLocation>(
-        "consumption_locations",
-        `id=eq.${locationId}&select=*&limit=1`,
-      );
+      let tenantId: string;
 
-      if (cancelled) return;
+      if (isPreview && previewTenantId) {
+        tenantId = previewTenantId;
+      } else if (locationId && channel) {
+        const locationRes = await anonSelect<ConsumptionLocation>(
+          "consumption_locations",
+          `id=eq.${locationId}&select=*&limit=1`,
+        );
 
-      const foundLocation = locationRes.data[0];
-      if (locationRes.error || !foundLocation) {
-        setError(locationRes.error ?? "Local não encontrado.");
-        setLoading(false);
-        return;
-      }
+        if (cancelled) return;
 
-      setLocation(foundLocation);
-
-      const storedToken = window.localStorage.getItem(tokenStorageKey(locationId));
-      let currentTab: Tab | null = null;
-
-      if (storedToken) {
-        const { data } = await anonRpc<Tab>("get_customer_tab", { p_token: storedToken });
-        currentTab = data;
-      }
-
-      if (!currentTab) {
-        const { data, error: openError } = await anonRpc<Tab>("open_customer_tab", {
-          p_location_id: locationId,
-          p_channel: channel,
-        });
-
-        if (openError || !data) {
-          const friendlyError = openError?.includes("already has an open tab")
-            ? "Esta mesa já está em atendimento. Chame um atendente para continuar."
-            : (openError ?? "Não foi possível iniciar seu pedido.");
-          setError(friendlyError);
+        const foundLocation = locationRes.data[0];
+        if (locationRes.error || !foundLocation) {
+          setError(locationRes.error ?? "Local não encontrado.");
           setLoading(false);
           return;
         }
 
-        currentTab = data;
-        window.localStorage.setItem(tokenStorageKey(locationId), data.access_token!);
+        setLocation(foundLocation);
+
+        const storedToken = window.localStorage.getItem(tokenStorageKey(locationId));
+        let currentTab: Tab | null = null;
+
+        if (storedToken) {
+          const { data } = await anonRpc<Tab>("get_customer_tab", { p_token: storedToken });
+          currentTab = data;
+        }
+
+        if (!currentTab) {
+          const { data, error: openError } = await anonRpc<Tab>("open_customer_tab", {
+            p_location_id: locationId,
+            p_channel: channel,
+          });
+
+          if (openError || !data) {
+            const friendlyError = openError?.includes("already has an open tab")
+              ? "Esta mesa já está em atendimento. Chame um atendente para continuar."
+              : (openError ?? "Não foi possível iniciar seu pedido.");
+            setError(friendlyError);
+            setLoading(false);
+            return;
+          }
+
+          currentTab = data;
+          window.localStorage.setItem(tokenStorageKey(locationId), data.access_token!);
+        }
+
+        if (cancelled) return;
+        setTab(currentTab);
+        tenantId = currentTab.tenant_id;
+      } else {
+        return;
       }
 
-      if (cancelled) return;
-      setTab(currentTab);
-
       const [categoriesRes, productsRes, tenantRes] = await Promise.all([
-        anonSelect<Category>(
-          "categories",
-          `tenant_id=eq.${currentTab.tenant_id}&select=*&order=name.asc`,
-        ),
-        anonSelect<Product>(
-          "products",
-          `tenant_id=eq.${currentTab.tenant_id}&select=*&order=name.asc`,
-        ),
-        anonSelect<{ brand_color: string | null; logo_url: string | null }>(
+        anonSelect<Category>("categories", `tenant_id=eq.${tenantId}&select=*&order=name.asc`),
+        anonSelect<Product>("products", `tenant_id=eq.${tenantId}&select=*&order=name.asc`),
+        anonSelect<{ name: string; brand_color: string | null; logo_url: string | null }>(
           "tenants",
-          `id=eq.${currentTab.tenant_id}&select=brand_color,logo_url&limit=1`,
+          `id=eq.${tenantId}&select=name,brand_color,logo_url&limit=1`,
         ),
       ]);
 
       if (!cancelled) {
+        setTenantName(tenantRes.data[0]?.name ?? null);
         setBrandColor(tenantRes.data[0]?.brand_color ?? null);
         setLogoUrl(tenantRes.data[0]?.logo_url ?? null);
       }
@@ -237,7 +245,7 @@ export function CustomerOrderPage({
     return () => {
       cancelled = true;
     };
-  }, [locationId, channel]);
+  }, [isPreview, previewTenantId, locationId, channel]);
 
   useEffect(() => {
     const elements = [...sectionRefs.current.values()];
@@ -362,7 +370,7 @@ export function CustomerOrderPage({
     return <p className="p-6 text-center text-sm text-danger">{error}</p>;
   }
 
-  if (!startedOrdering) {
+  if (!startedOrdering && !isPreview) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center" style={brandStyleVars(brandColor)}>
         <p className="text-2xl">{greeting()}! 👋</p>
@@ -506,6 +514,11 @@ export function CustomerOrderPage({
       className="flex min-h-screen flex-col bg-[#F9F6F0] text-[#1A1A1A]"
       style={brandStyleVars(brandColor)}
     >
+      {isPreview && (
+        <div className="sticky top-0 z-20 bg-brand px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-brand-foreground">
+          Modo pré-visualização — assim seu cliente vê o cardápio. Pedidos estão desligados aqui.
+        </div>
+      )}
       <div className="flex flex-col items-center gap-2 px-6 pb-4 pt-8 text-center">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external Blob URL
@@ -533,7 +546,7 @@ export function CustomerOrderPage({
         <h1
           className={`${playfair.className} border-y border-brand/30 px-4 py-2 text-2xl uppercase tracking-[0.2em] text-brand`}
         >
-          {location?.label ?? "Cardápio"}
+          {isPreview ? (tenantName ?? "Cardápio") : (location?.label ?? "Cardápio")}
         </h1>
         <p className="text-xs uppercase tracking-widest text-[#666666]">{greeting()}</p>
       </div>
@@ -597,30 +610,35 @@ export function CustomerOrderPage({
               {section.name}
             </h2>
             <div className="flex flex-col divide-y divide-[#1A1A1A]/10">
-              {section.products.map((product) => (
-                <button
-                  key={product.id}
-                  onClick={() => handleAddToCart(product)}
-                  className="flex items-center justify-between gap-3 py-4 text-left"
-                >
-                  <div className="flex flex-col gap-1">
-                    <span className="font-sans text-sm font-bold uppercase tracking-wide md:text-base">
-                      {product.name}
-                    </span>
-                    {product.description && (
-                      <p className="font-serif text-xs italic leading-relaxed text-[#666666] md:text-sm">
-                        {product.description}
-                      </p>
+              {section.products.map((product) => {
+                const Row = isPreview ? "div" : "button";
+                return (
+                  <Row
+                    key={product.id}
+                    onClick={isPreview ? undefined : () => handleAddToCart(product)}
+                    className="flex items-center justify-between gap-3 py-4 text-left"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="font-sans text-sm font-bold uppercase tracking-wide md:text-base">
+                        {product.name}
+                      </span>
+                      {product.description && (
+                        <p className="font-serif text-xs italic leading-relaxed text-[#666666] md:text-sm">
+                          {product.description}
+                        </p>
+                      )}
+                      <span className="font-sans text-sm font-bold text-brand">
+                        {formatBRL(Number(product.price))}
+                      </span>
+                    </div>
+                    {!isPreview && (
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand text-lg text-brand">
+                        +
+                      </span>
                     )}
-                    <span className="font-sans text-sm font-bold text-brand">
-                      {formatBRL(Number(product.price))}
-                    </span>
-                  </div>
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand text-lg text-brand">
-                    +
-                  </span>
-                </button>
-              ))}
+                  </Row>
+                );
+              })}
             </div>
           </section>
         ))}
