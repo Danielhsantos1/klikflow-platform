@@ -433,56 +433,80 @@ export function CustomerOrderPage({
       style={brandStyleVars(brandColor)}
     >
       <div className="flex flex-1 flex-col lg:overflow-y-auto">
-        <header className="flex flex-col items-center gap-1 p-6 text-center md:p-12 md:pb-6">
-          <h1
-            className={`${playfair.className} text-3xl uppercase tracking-[0.2em] text-brand md:text-4xl`}
-          >
-            {location?.label ?? "Cardápio"}
-          </h1>
-          <p className="text-xs uppercase tracking-widest text-[#666666]">{greeting()}</p>
-        </header>
+        <div className="mx-auto w-full max-w-5xl px-6 pb-16 pt-10 md:px-12 md:pt-16">
+          <div className="mb-12 flex flex-col items-center gap-3 text-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-brand"
+            >
+              <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+              <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+              <line x1="6" x2="6" y1="2" y2="4" />
+              <line x1="10" x2="10" y1="2" y2="4" />
+              <line x1="14" x2="14" y1="2" y2="4" />
+            </svg>
+            <h1
+              className={`${playfair.className} mx-auto max-w-md border-y border-brand/30 py-3 text-3xl uppercase tracking-[0.25em] text-brand md:text-4xl`}
+            >
+              {location?.label ?? "Cardápio"}
+            </h1>
+            <p className="text-xs uppercase tracking-widest text-[#666666]">{greeting()}</p>
+          </div>
 
-        <div className="flex flex-col gap-8 px-6 pb-6 md:px-12 md:pb-12">
-          {error && <p className="text-sm text-danger">{error}</p>}
+          {error && <p className="mb-6 text-sm text-danger">{error}</p>}
 
-          {sections.map((section) => (
-            <section key={section.id} className="flex flex-col gap-4">
-              <h2 className="font-sans text-sm font-bold uppercase tracking-wider text-brand">
-                {section.name}
-              </h2>
-              <div className="grid grid-cols-1 gap-x-12 gap-y-6 md:grid-cols-2">
-                {section.products.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => handleAddToCart(product)}
-                    className="flex flex-col text-left"
-                  >
-                    <div className="flex items-end">
-                      <span className="font-sans text-sm font-bold uppercase md:text-base">
-                        {product.name}
-                      </span>
-                      <span className="mx-2 mb-1 flex-grow self-end border-b border-dotted border-gray-400" />
-                      <span className="font-sans font-bold">
-                        {formatBRL(Number(product.price))}
-                      </span>
-                      <span className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand text-xs text-brand">
-                        +
-                      </span>
-                    </div>
-                    {product.description && (
-                      <p className="mt-1 font-serif text-xs italic text-[#666666] md:text-sm">
-                        {product.description}
-                      </p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </section>
-          ))}
+          <div className="grid grid-cols-1 gap-x-16 gap-y-12 md:grid-cols-2">
+            {sections.map((section) => (
+              <section key={section.id} className="flex flex-col gap-6">
+                <h2 className="border-b border-[#1A1A1A]/10 pb-2 text-center text-xl font-bold uppercase tracking-widest md:text-left">
+                  {section.name}
+                </h2>
+                <div className="flex flex-col gap-6">
+                  {section.products.map((product) => (
+                    <button
+                      key={product.id}
+                      onClick={() => handleAddToCart(product)}
+                      className="flex flex-col text-left"
+                    >
+                      <div className="flex w-full items-end justify-between">
+                        <span className="whitespace-nowrap font-sans text-sm font-bold uppercase tracking-wide md:text-base">
+                          {product.name}
+                        </span>
+                        <span className="mx-2 mb-1 min-w-[20px] flex-grow border-b border-dotted border-[#1A1A1A]/30" />
+                        <span className="whitespace-nowrap font-sans text-sm font-bold md:text-base">
+                          {formatBRL(Number(product.price))}
+                        </span>
+                        <span className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand text-xs text-brand">
+                          +
+                        </span>
+                      </div>
+                      {product.description && (
+                        <p className="mt-1 max-w-[90%] font-serif text-xs italic leading-relaxed text-[#666666] md:text-sm">
+                          {product.description}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
 
           {sections.length === 0 && (
             <p className="text-sm text-[#666666]">Nenhum produto cadastrado ainda.</p>
           )}
+
+          <footer className="mt-20 border-t border-brand/20 pt-6 text-center text-xs uppercase tracking-widest text-[#666666]">
+            KlikFlow
+          </footer>
         </div>
       </div>
 
