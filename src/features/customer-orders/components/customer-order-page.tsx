@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { CategoryPills } from "@/components/pos/category-pills";
 import { ProductCard } from "@/components/pos/product-card";
 import { CartPanel, type CartLine } from "@/components/pos/cart-panel";
+import { brandStyleVars } from "@/lib/theme/brand-style";
 import type { Category, ConsumptionLocation, Product } from "@/types/catalog";
 import type { Tab } from "@/types/order";
 import type { Order, OrderItem } from "@/types/order";
@@ -96,6 +97,7 @@ export function CustomerOrderPage({
   const [pickupNumber, setPickupNumber] = useState<number | null>(null);
   const [orderStatusKey, setOrderStatusKey] = useState<string | null>(null);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [brandColor, setBrandColor] = useState<string | null>(null);
 
   const accessToken = tab?.access_token ?? null;
 
@@ -196,7 +198,7 @@ export function CustomerOrderPage({
       if (cancelled) return;
       setTab(currentTab);
 
-      const [categoriesRes, productsRes] = await Promise.all([
+      const [categoriesRes, productsRes, tenantRes] = await Promise.all([
         anonSelect<Category>(
           "categories",
           `tenant_id=eq.${currentTab.tenant_id}&select=*&order=name.asc`,
@@ -205,7 +207,13 @@ export function CustomerOrderPage({
           "products",
           `tenant_id=eq.${currentTab.tenant_id}&select=*&order=name.asc`,
         ),
+        anonSelect<{ brand_color: string | null }>(
+          "tenants",
+          `id=eq.${currentTab.tenant_id}&select=brand_color&limit=1`,
+        ),
       ]);
+
+      if (!cancelled) setBrandColor(tenantRes.data[0]?.brand_color ?? null);
 
       if (!cancelled) {
         setCategories(categoriesRes.data);
@@ -324,7 +332,7 @@ export function CustomerOrderPage({
 
   if (!startedOrdering) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
+      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center" style={brandStyleVars(brandColor)}>
         <p className="text-2xl">{greeting()}! 👋</p>
         <p className="text-lg text-muted">Como você deseja fazer seu pedido?</p>
         <Button size="lg" onClick={() => setStartedOrdering(true)}>
@@ -338,7 +346,7 @@ export function CustomerOrderPage({
     const isReady = orderStatusKey === "ready";
 
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center" style={brandStyleVars(brandColor)}>
         <p className="text-2xl">{isReady ? "Pedido pronto! 🎉" : "Pagamento aprovado! ✅"}</p>
         {pickupNumber != null && (
           <p className="text-5xl font-extrabold text-brand">Nº {pickupNumber}</p>
@@ -356,7 +364,7 @@ export function CustomerOrderPage({
     const checkoutTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
+      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center" style={brandStyleVars(brandColor)}>
         <p className="text-2xl">Quase lá!</p>
         <div className="flex w-full max-w-sm flex-col gap-1.5 text-left">
           <label htmlFor="customer-name" className="text-sm font-medium">
@@ -407,7 +415,7 @@ export function CustomerOrderPage({
   );
 
   return (
-    <main className="flex flex-1 flex-col lg:flex-row">
+    <main className="flex flex-1 flex-col lg:flex-row" style={brandStyleVars(brandColor)}>
       <div className="flex flex-1 flex-col gap-4 lg:overflow-y-auto">
         <div className="flex flex-col gap-1 bg-foreground px-4 py-6 text-background sm:px-6">
           <span className="text-sm font-medium opacity-80">{greeting()} 👋</span>

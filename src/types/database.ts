@@ -106,6 +106,7 @@ export interface Database {
           name: string;
           segment: TenantSegment;
           status: TenantStatus;
+          brand_color: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -116,6 +117,7 @@ export interface Database {
           name?: string;
           segment?: TenantSegment;
           status?: TenantStatus;
+          brand_color?: string | null;
           updated_at?: string;
         };
         Relationships: [];

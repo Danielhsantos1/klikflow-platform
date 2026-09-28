@@ -15,9 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert } from "@/components/ui/alert";
 import { AppShell, type NavSection } from "@/components/layout/app-shell";
+import { AppearanceSettings } from "@/features/appearance/components/appearance-settings";
+import { brandStyleVars } from "@/lib/theme/brand-style";
 
-type ActiveTenant = { id: string; name: string };
-type View = "operations" | "production" | "catalog" | "team";
+type ActiveTenant = { id: string; name: string; brandColor: string | null };
+type View = "operations" | "production" | "catalog" | "team" | "appearance";
 
 const STUCK_TIMEOUT_MS = 8000;
 
@@ -48,7 +50,7 @@ export function TenantDashboard() {
         const db = createDbClient();
         const { data, error: fetchError } = await db
           .from("memberships")
-          .select("tenant_id, tenants(name)")
+          .select("tenant_id, tenants(name, brand_color)")
           .eq("user_id", userId!)
           .eq("status", "active")
           .limit(1)
@@ -59,8 +61,15 @@ export function TenantDashboard() {
         if (fetchError) {
           setError(fetchError.message);
         } else if (data) {
-          const tenantRow = data.tenants as unknown as { name: string } | null;
-          setTenant({ id: data.tenant_id, name: tenantRow?.name ?? "" });
+          const tenantRow = data.tenants as unknown as {
+            name: string;
+            brand_color: string | null;
+          } | null;
+          setTenant({
+            id: data.tenant_id,
+            name: tenantRow?.name ?? "",
+            brandColor: tenantRow?.brand_color ?? null,
+          });
         }
       } catch (thrown) {
         if (!cancelled) {
@@ -109,7 +118,7 @@ export function TenantDashboard() {
   if (!tenant) {
     return (
       <div className="flex flex-col items-center gap-6 px-6 py-16">
-        <CreateTenantForm onCreated={setTenant} />
+        <CreateTenantForm onCreated={(created) => setTenant({ ...created, brandColor: null })} />
       </div>
     );
   }
@@ -127,7 +136,10 @@ export function TenantDashboard() {
     },
     {
       label: "Configurações",
-      items: [{ key: "team", label: "Equipe", available: true }],
+      items: [
+        { key: "team", label: "Equipe", available: true },
+        { key: "appearance", label: "Aparência", available: true },
+      ],
     },
     {
       label: "Em breve",
@@ -140,6 +152,7 @@ export function TenantDashboard() {
   ];
 
   return (
+    <div style={brandStyleVars(tenant.brandColor)} className="contents">
     <AppShell
       companyName={tenant.name}
       unitName="Unidade Principal"
@@ -173,7 +186,15 @@ export function TenantDashboard() {
             <MembersManager tenantId={tenant.id} />
           </div>
         )}
+        {view === "appearance" && (
+          <AppearanceSettings
+            tenantId={tenant.id}
+            currentColor={tenant.brandColor}
+            onChanged={(brandColor) => setTenant((current) => current && { ...current, brandColor })}
+          />
+        )}
       </div>
     </AppShell>
+    </div>
   );
 }
