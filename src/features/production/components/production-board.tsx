@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { OrderItemStation } from "@/types/order";
 
+const POLL_MS = 5000;
+
 type StationItem = OrderItemStation & {
   order_items: {
     product_name: string;
@@ -63,15 +65,20 @@ export function ProductionBoard() {
   useEffect(() => {
     let cancelled = false;
 
-    fetchQueue().then((result) => {
+    async function poll() {
+      const result = await fetchQueue();
       if (cancelled) return;
       if (result.error) setError(result.error);
       else setItems(result.items ?? []);
       setLoading(false);
-    });
+    }
+
+    poll();
+    const interval = setInterval(poll, POLL_MS);
 
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 
