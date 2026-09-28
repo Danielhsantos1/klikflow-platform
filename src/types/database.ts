@@ -773,6 +773,7 @@ export interface Database {
           pickup_number: number | null;
           customer_name: string | null;
           location_label: string;
+          channel: string;
           ready_since: string;
         }[];
       };
