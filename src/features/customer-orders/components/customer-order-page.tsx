@@ -18,7 +18,7 @@ function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-type CustomerChannel = "qr_code" | "totem";
+type CustomerChannel = "qr_code" | "totem" | "tablet_mesa";
 
 type CartItem = { id: string; name: string; unitPrice: number; quantity: number };
 

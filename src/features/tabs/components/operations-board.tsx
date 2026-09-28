@@ -14,7 +14,14 @@ import type { Tab } from "@/types/order";
 const CHANNEL_LABEL: Record<Tab["channel"], string> = {
   staff: "Aberta pela equipe",
   qr_code: "Aberta por cliente (QR Code)",
+  tablet_mesa: "Aberta por cliente (Tablet na Mesa)",
   totem: "Aberta por cliente (Totem)",
+};
+
+const CHANNEL_SHORT_LABEL: Record<"qr_code" | "tablet_mesa" | "totem", string> = {
+  qr_code: "QR Code (cliente escaneia com o próprio celular)",
+  tablet_mesa: "Tablet na Mesa (aparelho fixo naquela mesa)",
+  totem: "Totem (aparelho compartilhado no balcão)",
 };
 
 type LocationWithTab = ConsumptionLocation & { openTab: Tab | null };
@@ -75,9 +82,9 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
   const [linksLocationId, setLinksLocationId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  function customerLink(locationId: string, channel: "qr_code" | "totem") {
+  function customerLink(locationId: string, channel: "qr_code" | "tablet_mesa" | "totem") {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const suffix = channel === "totem" ? "?channel=totem" : "";
+    const suffix = channel === "qr_code" ? "" : `?channel=${channel}`;
     return `${origin}/pedir/${locationId}${suffix}`;
   }
 
@@ -242,13 +249,18 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
                 </div>
               </div>
               {linksLocationId === location.id && (
-                <div className="flex flex-col gap-2 border-t border-border px-3 py-3">
-                  {(["qr_code", "totem"] as const).map((channel) => {
+                <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
+                  <p className="text-xs text-muted">
+                    Escolha como esse local vai atender: gere um QR Code pra colar na mesa, abra o
+                    link do Tablet direto no aparelho fixado nela, ou use o Totem no balcão de
+                    autoatendimento. Os três levam ao mesmo cardápio — só muda o aparelho.
+                  </p>
+                  {(["qr_code", "tablet_mesa", "totem"] as const).map((channel) => {
                     const link = customerLink(location.id, channel);
                     return (
                       <div key={channel} className="flex flex-col gap-1">
                         <span className="text-xs font-medium text-muted">
-                          {channel === "qr_code" ? "QR Code" : "Totem"}
+                          {CHANNEL_SHORT_LABEL[channel]}
                         </span>
                         <div className="flex items-center gap-2">
                           <code className="flex-1 truncate rounded bg-black/[0.04] px-2 py-1 text-xs dark:bg-white/[0.06]">

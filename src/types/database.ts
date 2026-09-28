@@ -56,7 +56,7 @@ export type TabStatus = "open" | "closed";
  * a future customer-facing channel is a data migration, not a
  * structural one. See docs/roadmap.md for the phased plan.
  */
-export type OrderChannel = "staff" | "qr_code" | "totem";
+export type OrderChannel = "staff" | "qr_code" | "totem" | "tablet_mesa";
 
 /**
  * A pedido's status is no longer a fixed enum (Task 06) — `orders`
@@ -733,7 +733,7 @@ export interface Database {
       // unauthenticated (`anonymous`) customer; each validates the
       // `access_token` against `tabs` before touching any row.
       open_customer_tab: {
-        Args: { p_location_id: string; p_channel: "qr_code" | "totem" };
+        Args: { p_location_id: string; p_channel: "qr_code" | "totem" | "tablet_mesa" };
         Returns: Database["public"]["Tables"]["tabs"]["Row"];
       };
       get_customer_tab: {

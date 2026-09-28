@@ -20,6 +20,7 @@ const NEWLY_READY_MS = 8000;
 const CHANNEL_BADGE: Record<string, { label: string; className: string }> = {
   totem: { label: "TOTEM", className: "bg-[#4db6ac]" },
   qr_code: { label: "NA MESA", className: "bg-[#ff9800]" },
+  tablet_mesa: { label: "TABLET NA MESA", className: "bg-[#8d6e63]" },
   staff: { label: "RETIRADA", className: "bg-[#1a1a1a]" },
 };
 
