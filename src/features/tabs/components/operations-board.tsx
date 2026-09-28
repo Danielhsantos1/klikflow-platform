@@ -7,7 +7,6 @@ import { createDbClient } from "@/lib/db/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TabPanel } from "@/features/tabs/components/tab-panel";
-import { TabHistory } from "@/features/tabs/components/tab-history";
 import { Badge } from "@/components/ui/badge";
 import type { Category, ConsumptionLocation, Product } from "@/types/catalog";
 import type { Tab } from "@/types/order";
@@ -75,7 +74,6 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
   const [expandedLocationId, setExpandedLocationId] = useState<string | null>(null);
   const [linksLocationId, setLinksLocationId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
-  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   function customerLink(locationId: string, channel: "qr_code" | "totem") {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -182,7 +180,6 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
     }
 
     setExpandedLocationId(null);
-    setHistoryRefreshKey((key) => key + 1);
     await reload();
   }
 
@@ -293,8 +290,6 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
           <Button type="submit">Adicionar</Button>
         </form>
       </section>
-
-      <TabHistory key={historyRefreshKey} tenantId={tenantId} />
     </div>
   );
 }

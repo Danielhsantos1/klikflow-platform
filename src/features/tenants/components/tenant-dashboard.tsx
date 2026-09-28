@@ -7,6 +7,7 @@ import { createDbClient } from "@/lib/db/client";
 import { CreateTenantForm } from "@/features/tenants/components/create-tenant-form";
 import { CatalogManager } from "@/features/catalog/components/catalog-manager";
 import { OperationsBoard } from "@/features/tabs/components/operations-board";
+import { TabHistory } from "@/features/tabs/components/tab-history";
 import { ProductionBoard } from "@/features/production/components/production-board";
 import { RolesManager } from "@/features/roles/components/roles-manager";
 import { MembersManager } from "@/features/members/components/members-manager";
@@ -19,7 +20,7 @@ import { AppearanceSettings } from "@/features/appearance/components/appearance-
 import { brandStyleVars } from "@/lib/theme/brand-style";
 
 type ActiveTenant = { id: string; name: string; brandColor: string | null; logoUrl: string | null };
-type View = "operations" | "production" | "catalog" | "team" | "appearance";
+type View = "operations" | "production" | "history" | "catalog" | "team" | "appearance";
 
 const STUCK_TIMEOUT_MS = 8000;
 
@@ -132,6 +133,7 @@ export function TenantDashboard() {
       items: [
         { key: "operations", label: "Comandas", available: true },
         { key: "production", label: "Produção", available: true },
+        { key: "history", label: "Histórico", available: true },
       ],
     },
     {
@@ -181,6 +183,7 @@ export function TenantDashboard() {
       <div className="flex flex-1 flex-col items-center">
         {view === "operations" && <OperationsBoard tenantId={tenant.id} />}
         {view === "production" && <ProductionBoard />}
+        {view === "history" && <TabHistory tenantId={tenant.id} />}
         {view === "catalog" && (
           <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
         )}
