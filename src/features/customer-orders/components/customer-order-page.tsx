@@ -372,7 +372,11 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
 
   if (!startedOrdering && !isPreview) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center" style={brandStyleVars(brandColor)}>
+      <main
+        translate="no"
+        className="notranslate flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center"
+        style={brandStyleVars(brandColor)}
+      >
         <p className="text-2xl">{greeting()}! 👋</p>
         <p className="text-lg text-muted">Como você deseja fazer seu pedido?</p>
         <Button size="lg" onClick={() => setStartedOrdering(true)}>
@@ -386,7 +390,11 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
     const isReady = orderStatusKey === "ready";
 
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center" style={brandStyleVars(brandColor)}>
+      <main
+        translate="no"
+        className="notranslate flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
+        style={brandStyleVars(brandColor)}
+      >
         <p className="text-2xl">{isReady ? "Pedido pronto! 🎉" : "Pagamento aprovado! ✅"}</p>
         {pickupNumber != null && (
           <p className="text-5xl font-extrabold text-brand">Nº {pickupNumber}</p>
@@ -415,7 +423,8 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
 
     return (
       <main
-        className="flex flex-1 flex-col items-center gap-6 bg-[#F9F6F0] px-6 py-10 text-center text-[#1A1A1A]"
+        translate="no"
+        className="notranslate flex flex-1 flex-col items-center gap-6 bg-[#F9F6F0] px-6 py-10 text-center text-[#1A1A1A]"
         style={brandStyleVars(brandColor)}
       >
         <p className="text-2xl">Quase lá!</p>
@@ -511,7 +520,8 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
 
   return (
     <main
-      className="flex min-h-screen flex-col bg-[#F9F6F0] text-[#1A1A1A]"
+      translate="no"
+      className="notranslate flex min-h-screen flex-col bg-[#F9F6F0] text-[#1A1A1A]"
       style={brandStyleVars(brandColor)}
     >
       {isPreview && (

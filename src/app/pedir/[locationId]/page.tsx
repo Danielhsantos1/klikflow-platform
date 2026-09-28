@@ -1,4 +1,18 @@
+import type { Metadata } from "next";
+
 import { CustomerOrderPage } from "@/features/customer-orders/components/customer-order-page";
+
+/**
+ * A tradução automática do Chrome inventava nomes de produto/categoria
+ * aqui (ex: "Bebidas" virou "Êxodo") — nomes de cardápio não são texto
+ * pra traduzir. `google: "notranslate"` pede pro Chrome não oferecer
+ * tradução nessa página; `translate="no"` no elemento raiz
+ * (customer-order-page.tsx) reforça mesmo quando o usuário já tinha
+ * "sempre traduzir" ativado pro domínio.
+ */
+export const metadata: Metadata = {
+  other: { google: "notranslate" },
+};
 
 /**
  * Public entry point for all three customer channels — `?channel=totem`
