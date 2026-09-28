@@ -438,6 +438,7 @@ export function CustomerOrderPage({
             onChange={(event) => setCustomerName(event.target.value)}
             placeholder="Pra te chamar no painel"
             autoFocus
+            className="border-brand/30 bg-white text-[#1A1A1A] placeholder:text-[#999999]"
           />
         </div>
         <p className="text-lg font-semibold">Total: {formatBRL(checkoutTotal)}</p>
