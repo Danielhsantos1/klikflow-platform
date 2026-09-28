@@ -777,6 +777,10 @@ export interface Database {
           ready_since: string;
         }[];
       };
+      mark_order_delivered: {
+        Args: { p_tenant_id: string; p_order_id: string };
+        Returns: Database["public"]["Tables"]["orders"]["Row"];
+      };
     };
     Enums: Record<string, never>;
   };

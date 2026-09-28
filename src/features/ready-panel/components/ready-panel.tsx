@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { anonRpcList, anonSelect } from "@/lib/db/anonymous";
+import { anonRpc, anonRpcList, anonSelect } from "@/lib/db/anonymous";
 import type { Tenant } from "@/types/tenant";
 
 type ReadyOrder = {
@@ -35,6 +35,12 @@ const CHANNEL_BADGE: Record<string, { label: string; className: string }> = {
  * `NEWLY_READY_MS` pra chamar atenção, depois se acomoda no visual
  * padrão da lista — sem isso, um pedido novo se perderia no meio dos
  * que já estão esperando há mais tempo.
+ *
+ * Tocar num pedido chama `mark_order_delivered()` (0027) e some da
+ * lista na hora (otimista, antes da resposta) — sem isso a lista só
+ * crescia pra sempre, já que nada nunca tirava um pedido "Pronto" dali.
+ * `list_ready_orders` também para de trazer um pedido com mais de 30min
+ * como rede de segurança, caso ninguém toque nele.
  */
 export function ReadyPanel({ tenantId }: { tenantId: string }) {
   const [tenantName, setTenantName] = useState<string | null>(null);
@@ -94,6 +100,19 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
     };
   }, [tenantId]);
 
+  async function handleDismiss(orderId: string) {
+    setOrders((current) => current.filter((order) => order.order_id !== orderId));
+
+    const { error: dismissError } = await anonRpc<void>("mark_order_delivered", {
+      p_tenant_id: tenantId,
+      p_order_id: orderId,
+    });
+
+    if (dismissError) {
+      setError(dismissError);
+    }
+  }
+
   return (
     <main className="flex min-h-screen flex-col gap-8 bg-foreground px-6 py-10 text-background sm:px-10">
       <header className="flex items-baseline justify-between">
@@ -109,9 +128,12 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
       {error && <p className="text-danger">{error}</p>}
 
       <section className="flex flex-col gap-4">
-        <p className="text-lg font-semibold uppercase tracking-wide text-brand">
-          Pedidos prontos para retirada
-        </p>
+        <div>
+          <p className="text-lg font-semibold uppercase tracking-wide text-brand">
+            Pedidos prontos para retirada
+          </p>
+          <p className="text-sm opacity-60">Toque num pedido pra tirar da lista ao entregar.</p>
+        </div>
         {orders.length === 0 ? (
           <p className="text-xl opacity-50">Nenhum pedido pronto no momento.</p>
         ) : (
@@ -124,9 +146,11 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
               };
 
               return (
-                <div
+                <button
                   key={order.order_id}
-                  className={`flex items-center justify-between gap-4 rounded-2xl border-2 border-black/40 px-6 py-6 sm:px-8 ${
+                  type="button"
+                  onClick={() => handleDismiss(order.order_id)}
+                  className={`flex items-center justify-between gap-4 rounded-2xl border-2 border-black/40 px-6 py-6 text-left transition-opacity active:opacity-70 sm:px-8 ${
                     isNew ? "animate-pulse bg-[#2ecf8b] text-[#0d0d0c]" : "bg-white/10"
                   }`}
                 >
@@ -145,7 +169,7 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
                   >
                     {badge.label}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
