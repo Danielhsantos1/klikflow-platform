@@ -42,6 +42,8 @@ export function CatalogManager({
   const [error, setError] = useState<string | null>(null);
 
   const [categoryName, setCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
   const [productName, setProductName] = useState("");
   const [productDescription, setProductDescription] = useState("");
   const [productPrice, setProductPrice] = useState("");
@@ -151,6 +153,57 @@ export function CatalogManager({
     await reload();
   }
 
+  function handleStartEditCategory(category: Category) {
+    setEditingCategoryId(category.id);
+    setEditingCategoryName(category.name);
+  }
+
+  async function handleSaveCategoryName(categoryId: string) {
+    setError(null);
+    const name = editingCategoryName.trim();
+    if (!name) {
+      setError("O nome da categoria não pode ficar em branco.");
+      return;
+    }
+
+    const db = createDbClient();
+    const { error: updateError } = await db
+      .from("categories")
+      .update({ name })
+      .eq("id", categoryId);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setEditingCategoryId(null);
+    setEditingCategoryName("");
+    await reload();
+  }
+
+  async function handleDeleteCategory(category: Category) {
+    setError(null);
+
+    const linkedProducts = products.filter((product) => product.category_id === category.id).length;
+    const message =
+      linkedProducts > 0
+        ? `Excluir "${category.name}"? ${linkedProducts} produto(s) vinculado(s) ficarão sem categoria (aparecem como "Sem categoria" no cardápio).`
+        : `Excluir a categoria "${category.name}"?`;
+
+    if (!window.confirm(message)) return;
+
+    const db = createDbClient();
+    const { error: deleteError } = await db.from("categories").delete().eq("id", category.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    await reload();
+  }
+
   async function handleUploadCategoryIcon(categoryId: string, file: File) {
     setError(null);
 
@@ -224,7 +277,29 @@ export function CatalogManager({
                   {category.name.charAt(0).toUpperCase()}
                 </div>
               )}
-              <span>{category.name}</span>
+              {editingCategoryId === category.id ? (
+                <div className="flex items-center gap-1">
+                  <Input
+                    autoFocus
+                    value={editingCategoryName}
+                    onChange={(event) => setEditingCategoryName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") handleSaveCategoryName(category.id);
+                      if (event.key === "Escape") setEditingCategoryId(null);
+                    }}
+                    className="h-7 w-24 px-1.5 text-xs"
+                  />
+                  <button
+                    type="button"
+                    className="text-xs text-brand"
+                    onClick={() => handleSaveCategoryName(category.id)}
+                  >
+                    Salvar
+                  </button>
+                </div>
+              ) : (
+                <span>{category.name}</span>
+              )}
               <label className="cursor-pointer text-xs text-brand underline underline-offset-2">
                 {category.image_url ? "Trocar ícone" : "Adicionar ícone"}
                 <input
@@ -238,6 +313,22 @@ export function CatalogManager({
                   }}
                 />
               </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="text-xs text-muted underline underline-offset-2"
+                  onClick={() => handleStartEditCategory(category)}
+                >
+                  Editar nome
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-red-600 underline underline-offset-2"
+                  onClick={() => handleDeleteCategory(category)}
+                >
+                  Excluir
+                </button>
+              </div>
             </li>
           ))}
           {categories.length === 0 && (
