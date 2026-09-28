@@ -217,7 +217,7 @@ export function CatalogManager({
                 <img
                   src={category.image_url}
                   alt={category.name}
-                  className="h-14 w-14 rounded-md object-cover"
+                  className="h-14 w-14 rounded-md bg-[#f5f5f5] object-contain p-1"
                 />
               ) : (
                 <div className="flex h-14 w-14 items-center justify-center rounded-md bg-brand-soft text-lg font-bold text-brand">

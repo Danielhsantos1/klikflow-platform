@@ -565,7 +565,7 @@ export function CustomerOrderPage({
                     <img
                       src={section.imageUrl}
                       alt=""
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-contain p-2"
                     />
                   ) : (
                     <span className="text-2xl font-bold text-[#3e2723]">
