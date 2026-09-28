@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { createDbClient } from "@/lib/db/client";
 import { uploadImage } from "@/lib/uploads/upload-image";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Category, Product, ProductionStation } from "@/types/catalog";
@@ -49,6 +50,9 @@ export function CatalogManager({
   const [productPrice, setProductPrice] = useState("");
   const [productCategoryId, setProductCategoryId] = useState("");
   const [stationName, setStationName] = useState("");
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editingProductName, setEditingProductName] = useState("");
+  const [editingProductDescription, setEditingProductDescription] = useState("");
 
   async function reload() {
     const { categoriesRes, productsRes, stationsRes } = await fetchCatalog(tenantId);
@@ -226,6 +230,53 @@ export function CatalogManager({
     }
   }
 
+  function handleStartEditProduct(product: Product) {
+    setEditingProductId(product.id);
+    setEditingProductName(product.name);
+    setEditingProductDescription(product.description ?? "");
+  }
+
+  async function handleSaveProduct(productId: string) {
+    setError(null);
+    const name = editingProductName.trim();
+    if (!name) {
+      setError("O nome do produto não pode ficar em branco.");
+      return;
+    }
+
+    const db = createDbClient();
+    const { error: updateError } = await db
+      .from("products")
+      .update({ name, description: editingProductDescription.trim() || null })
+      .eq("id", productId);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setEditingProductId(null);
+    await reload();
+  }
+
+  async function handleToggleProductStatus(product: Product) {
+    setError(null);
+
+    const nextStatus = product.status === "active" ? "archived" : "active";
+    const db = createDbClient();
+    const { error: updateError } = await db
+      .from("products")
+      .update({ status: nextStatus })
+      .eq("id", product.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    await reload();
+  }
+
   async function handleLinkStation(productId: string, stationId: string) {
     setError(null);
 
@@ -385,33 +436,93 @@ export function CatalogManager({
           <p className="text-sm text-muted">
             O que aparece pra equipe lançar na comanda e pro cliente pedir pelo QR Code/Totem. Se
             o produto precisa ser preparado, vincule a uma estação (abaixo do nome) — senão ele
-            vai direto pra entrega sem passar pela Produção.
+            vai direto pra entrega sem passar pela Produção. Use &quot;Desativar&quot; pra tirar um
+            item do cardápio temporariamente (ex: acabou o ingrediente) sem perder o cadastro —
+            ele some do cardápio do cliente e volta assim que você clicar em &quot;Ativar&quot;.
           </p>
         </div>
         <ul className="flex flex-col gap-2">
           {products.map((product) => {
             const linkedStation = product.product_stations[0]?.production_stations?.name;
+            const isEditing = editingProductId === product.id;
+            const isActive = product.status === "active";
+
             return (
               <li
                 key={product.id}
-                className="flex flex-col gap-2 rounded-md border border-neutral-200 px-3 py-2 text-sm"
+                className={`flex flex-col gap-2 rounded-md border border-neutral-200 px-3 py-2 text-sm ${
+                  isActive ? "" : "opacity-60"
+                }`}
               >
-                <div className="flex items-center justify-between">
-                  <span>
-                    {product.name}
-                    {product.categories?.name && (
-                      <span className="text-neutral-400"> — {product.categories.name}</span>
+                {isEditing ? (
+                  <div className="flex flex-col gap-2">
+                    <Input
+                      autoFocus
+                      value={editingProductName}
+                      onChange={(event) => setEditingProductName(event.target.value)}
+                      placeholder="Nome do produto"
+                    />
+                    <Input
+                      value={editingProductDescription}
+                      onChange={(event) => setEditingProductDescription(event.target.value)}
+                      placeholder="Descrição (opcional)"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleSaveProduct(product.id)}>
+                        Salvar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingProductId(null)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <span>
+                        {product.name}
+                        {product.categories?.name && (
+                          <span className="text-neutral-400"> — {product.categories.name}</span>
+                        )}
+                        {!isActive && (
+                          <Badge variant="neutral" className="ml-2">
+                            Inativo
+                          </Badge>
+                        )}
+                      </span>
+                      <span className="font-medium">
+                        {Number(product.price).toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
+                      </span>
+                    </div>
+                    {product.description && (
+                      <p className="text-xs italic text-muted">{product.description}</p>
                     )}
-                  </span>
-                  <span className="font-medium">
-                    {Number(product.price).toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })}
-                  </span>
-                </div>
-                {product.description && (
-                  <p className="text-xs italic text-muted">{product.description}</p>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        className="text-xs text-brand underline underline-offset-2"
+                        onClick={() => handleStartEditProduct(product)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className={`text-xs underline underline-offset-2 ${
+                          isActive ? "text-red-600" : "text-success"
+                        }`}
+                        onClick={() => handleToggleProductStatus(product)}
+                      >
+                        {isActive ? "Desativar" : "Ativar"}
+                      </button>
+                    </div>
+                  </>
                 )}
                 {linkedStation ? (
                   <span className="text-xs text-neutral-400">
