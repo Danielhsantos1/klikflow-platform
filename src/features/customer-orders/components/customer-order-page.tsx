@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Playfair_Display } from "next/font/google";
 
 import { anonRpc, anonSelect } from "@/lib/db/anonymous";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CartPanel, type CartLine } from "@/components/pos/cart-panel";
+import type { CartLine } from "@/components/pos/cart-panel";
 import { brandStyleVars } from "@/lib/theme/brand-style";
 import type { Category, ConsumptionLocation, Product } from "@/types/catalog";
 import type { Tab } from "@/types/order";
@@ -102,6 +102,8 @@ export function CustomerOrderPage({
   const [pickupNumber, setPickupNumber] = useState<number | null>(null);
   const [orderStatusKey, setOrderStatusKey] = useState<string | null>(null);
   const [brandColor, setBrandColor] = useState<string | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   const accessToken = tab?.access_token ?? null;
 
@@ -232,6 +234,28 @@ export function CustomerOrderPage({
       cancelled = true;
     };
   }, [locationId, channel]);
+
+  useEffect(() => {
+    const elements = [...sectionRefs.current.values()];
+    if (elements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+
+        if (visible) {
+          const id = visible.target.id.replace("section-", "");
+          setActiveSectionId(id);
+        }
+      },
+      { rootMargin: "-96px 0px -70% 0px", threshold: 0 },
+    );
+
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [products, categories]);
 
   async function handleAddToCart(product: Product) {
     if (!tab?.access_token) return;
@@ -365,11 +389,45 @@ export function CustomerOrderPage({
   }
 
   if (checkingOut) {
+    const checkoutLines: CartLine[] = Object.values(
+      cart.reduce<Record<string, CartLine>>((lines, item) => {
+        const key = `${item.name}:${item.unitPrice}`;
+        const existing = lines[key];
+        lines[key] = existing
+          ? { ...existing, quantity: existing.quantity + item.quantity }
+          : { key, name: item.name, unitPrice: item.unitPrice, quantity: item.quantity };
+        return lines;
+      }, {}),
+    );
     const checkoutTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center" style={brandStyleVars(brandColor)}>
+      <main
+        className="flex flex-1 flex-col items-center gap-6 bg-[#F9F6F0] px-6 py-10 text-center text-[#1A1A1A]"
+        style={brandStyleVars(brandColor)}
+      >
         <p className="text-2xl">Quase lá!</p>
+
+        <div className="flex w-full max-w-sm flex-col gap-2 text-left">
+          {checkoutLines.map((line) => (
+            <div key={line.key} className="flex items-start justify-between gap-2 text-sm">
+              <span>
+                {line.quantity} {line.name}
+              </span>
+              <span className="flex items-center gap-2 text-[#666666]">
+                {formatBRL(line.unitPrice * line.quantity)}
+                <button
+                  onClick={() => handleRemoveFromCart(line.key)}
+                  className="text-danger hover:underline"
+                  aria-label={`Remover uma unidade de ${line.name}`}
+                >
+                  −
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+
         <div className="flex w-full max-w-sm flex-col gap-1.5 text-left">
           <label htmlFor="customer-name" className="text-sm font-medium">
             Qual seu nome?
@@ -382,19 +440,17 @@ export function CustomerOrderPage({
             autoFocus
           />
         </div>
-        <p className="text-lg font-semibold">
-          Total: {checkoutTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-        </p>
+        <p className="text-lg font-semibold">Total: {formatBRL(checkoutTotal)}</p>
         {error && <p className="text-sm text-danger">{error}</p>}
         <Button
           size="lg"
-          disabled={!customerName.trim() || paying}
+          disabled={!customerName.trim() || paying || checkoutLines.length === 0}
           onClick={handleConfirmPayment}
         >
           {paying ? "Confirmando..." : "Pagamento aprovado (simulado)"}
         </Button>
         <button
-          className="text-sm text-muted underline underline-offset-4"
+          className="text-sm text-[#666666] underline underline-offset-4"
           onClick={() => setCheckingOut(false)}
         >
           Voltar ao cardápio
@@ -427,99 +483,137 @@ export function CustomerOrderPage({
     }, {}),
   );
 
+  const cartItemCount = cartLines.reduce((sum, line) => sum + line.quantity, 0);
+  const cartTotal = cartLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+
+  function scrollToSection(sectionId: string) {
+    setActiveSectionId(sectionId);
+    sectionRefs.current
+      .get(sectionId)
+      ?.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+  }
+
   return (
     <main
-      className="flex flex-1 flex-col bg-[#F9F6F0] text-[#1A1A1A] lg:flex-row"
+      className="flex min-h-screen flex-col bg-[#F9F6F0] text-[#1A1A1A]"
       style={brandStyleVars(brandColor)}
     >
-      <div className="flex flex-1 flex-col lg:overflow-y-auto">
-        <div className="mx-auto w-full max-w-5xl px-6 pb-16 pt-10 md:px-12 md:pt-16">
-          <div className="mb-12 flex flex-col items-center gap-3 text-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-brand"
-            >
-              <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
-              <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
-              <line x1="6" x2="6" y1="2" y2="4" />
-              <line x1="10" x2="10" y1="2" y2="4" />
-              <line x1="14" x2="14" y1="2" y2="4" />
-            </svg>
-            <h1
-              className={`${playfair.className} mx-auto max-w-md border-y border-brand/30 py-3 text-3xl uppercase tracking-[0.25em] text-brand md:text-4xl`}
-            >
-              {location?.label ?? "Cardápio"}
-            </h1>
-            <p className="text-xs uppercase tracking-widest text-[#666666]">{greeting()}</p>
-          </div>
-
-          {error && <p className="mb-6 text-sm text-danger">{error}</p>}
-
-          <div className="grid grid-cols-1 gap-x-16 gap-y-12 md:grid-cols-2">
-            {sections.map((section) => (
-              <section key={section.id} className="flex flex-col gap-6">
-                <h2 className="border-b border-[#1A1A1A]/10 pb-2 text-center text-xl font-bold uppercase tracking-widest md:text-left">
-                  {section.name}
-                </h2>
-                <div className="flex flex-col gap-6">
-                  {section.products.map((product) => (
-                    <button
-                      key={product.id}
-                      onClick={() => handleAddToCart(product)}
-                      className="flex flex-col text-left"
-                    >
-                      <div className="flex w-full items-end justify-between">
-                        <span className="whitespace-nowrap font-sans text-sm font-bold uppercase tracking-wide md:text-base">
-                          {product.name}
-                        </span>
-                        <span className="mx-2 mb-1 min-w-[20px] flex-grow border-b border-dotted border-[#1A1A1A]/30" />
-                        <span className="whitespace-nowrap font-sans text-sm font-bold md:text-base">
-                          {formatBRL(Number(product.price))}
-                        </span>
-                        <span className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand text-xs text-brand">
-                          +
-                        </span>
-                      </div>
-                      {product.description && (
-                        <p className="mt-1 max-w-[90%] font-serif text-xs italic leading-relaxed text-[#666666] md:text-sm">
-                          {product.description}
-                        </p>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-
-          {sections.length === 0 && (
-            <p className="text-sm text-[#666666]">Nenhum produto cadastrado ainda.</p>
-          )}
-
-          <footer className="mt-20 border-t border-brand/20 pt-6 text-center text-xs uppercase tracking-widest text-[#666666]">
-            KlikFlow
-          </footer>
-        </div>
+      <div className="flex flex-col items-center gap-2 px-6 pb-4 pt-8 text-center">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-brand"
+        >
+          <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+          <line x1="6" x2="6" y1="2" y2="4" />
+          <line x1="10" x2="10" y1="2" y2="4" />
+          <line x1="14" x2="14" y1="2" y2="4" />
+        </svg>
+        <h1
+          className={`${playfair.className} border-y border-brand/30 px-4 py-2 text-2xl uppercase tracking-[0.2em] text-brand`}
+        >
+          {location?.label ?? "Cardápio"}
+        </h1>
+        <p className="text-xs uppercase tracking-widest text-[#666666]">{greeting()}</p>
       </div>
 
-      <aside className="border-t border-brand/20 bg-[#F9F6F0] px-4 py-4 sm:px-6 lg:sticky lg:top-0 lg:h-screen lg:w-80 lg:shrink-0 lg:border-t-0 lg:border-l">
-        <CartPanel
-          title="Seu pedido"
-          lines={cartLines}
-          actionLabel="Finalizar pedido"
-          onAction={() => setCheckingOut(true)}
-          emptyLabel="Adicione itens do cardápio."
-          onRemove={handleRemoveFromCart}
-        />
-      </aside>
+      {error && <p className="px-6 text-sm text-danger">{error}</p>}
+
+      {sections.length > 1 && (
+        <div className="sticky top-0 z-10 flex gap-2 overflow-x-auto border-b border-brand/15 bg-[#F9F6F0]/95 px-4 py-3 backdrop-blur">
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              onClick={() => scrollToSection(section.id)}
+              className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
+                activeSectionId === section.id
+                  ? "border-brand bg-brand text-brand-foreground"
+                  : "border-brand/30 text-brand"
+              }`}
+            >
+              {section.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className={`flex flex-1 flex-col gap-10 px-6 py-8 ${cartItemCount > 0 ? "pb-28" : ""}`}>
+        {sections.map((section) => (
+          <section
+            key={section.id}
+            id={`section-${section.id}`}
+            ref={(node) => {
+              if (node) sectionRefs.current.set(section.id, node);
+              else sectionRefs.current.delete(section.id);
+            }}
+            className="flex flex-col gap-4 scroll-mt-20"
+          >
+            <h2 className="border-b border-[#1A1A1A]/10 pb-2 text-lg font-bold uppercase tracking-widest">
+              {section.name}
+            </h2>
+            <div className="flex flex-col divide-y divide-[#1A1A1A]/10">
+              {section.products.map((product) => (
+                <button
+                  key={product.id}
+                  onClick={() => handleAddToCart(product)}
+                  className="flex items-center justify-between gap-3 py-4 text-left"
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className="font-sans text-sm font-bold uppercase tracking-wide md:text-base">
+                      {product.name}
+                    </span>
+                    {product.description && (
+                      <p className="font-serif text-xs italic leading-relaxed text-[#666666] md:text-sm">
+                        {product.description}
+                      </p>
+                    )}
+                    <span className="font-sans text-sm font-bold text-brand">
+                      {formatBRL(Number(product.price))}
+                    </span>
+                  </div>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand text-lg text-brand">
+                    +
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+
+        {sections.length === 0 && (
+          <p className="text-sm text-[#666666]">Nenhum produto cadastrado ainda.</p>
+        )}
+
+        <footer className="mt-6 border-t border-brand/20 pt-6 text-center text-xs uppercase tracking-widest text-[#666666]">
+          KlikFlow
+        </footer>
+      </div>
+
+      {cartItemCount > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-4 border-t border-brand/20 bg-brand px-6 py-4 text-brand-foreground shadow-lg">
+          <div className="flex flex-col">
+            <span className="text-xs uppercase tracking-wide opacity-80">
+              {cartItemCount} {cartItemCount === 1 ? "item" : "itens"}
+            </span>
+            <span className="font-bold">{formatBRL(cartTotal)}</span>
+          </div>
+          <Button
+            variant="secondary"
+            className="bg-brand-foreground text-brand hover:opacity-90"
+            onClick={() => setCheckingOut(true)}
+          >
+            Ver pedido
+          </Button>
+        </div>
+      )}
     </main>
   );
 }
