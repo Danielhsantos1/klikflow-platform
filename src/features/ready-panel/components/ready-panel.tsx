@@ -40,7 +40,9 @@ const CHANNEL_BADGE: Record<string, { label: string; className: string }> = {
  * lista na hora (otimista, antes da resposta) — sem isso a lista só
  * crescia pra sempre, já que nada nunca tirava um pedido "Pronto" dali.
  * `list_ready_orders` também para de trazer um pedido com mais de 30min
- * como rede de segurança, caso ninguém toque nele.
+ * como rede de segurança, caso ninguém toque nele, e mostra no máximo
+ * 10 de cada vez (0028) — o próximo da fila entra sozinho assim que um
+ * sai, porque a lista inteira é recalculada a cada poll.
  */
 export function ReadyPanel({ tenantId }: { tenantId: string }) {
   const [tenantName, setTenantName] = useState<string | null>(null);
@@ -161,8 +163,13 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
                   >
                     {order.pickup_number != null ? `#${order.pickup_number}` : "—"}
                   </span>
-                  <span className="flex-1 text-xl font-bold uppercase sm:text-3xl">
-                    {order.customer_name ?? order.location_label}
+                  <span className="flex flex-1 flex-col">
+                    <span className="text-xl font-bold uppercase sm:text-3xl">
+                      {order.customer_name ?? order.location_label}
+                    </span>
+                    <span className="text-sm font-semibold uppercase tracking-wide opacity-70 sm:text-base">
+                      Retirar no balcão
+                    </span>
                   </span>
                   <span
                     className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white sm:px-4 sm:py-2 sm:text-base ${badge.className}`}

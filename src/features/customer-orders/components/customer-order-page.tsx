@@ -34,6 +34,7 @@ function greeting() {
 }
 
 const ORDER_STATUS_POLL_MS = 5000;
+const TOTEM_RESET_MS = 6000;
 
 /** Short two-tone beep via Web Audio — no audio file to ship/host. */
 function playReadyChime() {
@@ -112,8 +113,14 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
 
   const accessToken = tab?.access_token ?? null;
 
+  const isTotem = channel === "totem";
+
   useEffect(() => {
-    if (!finished || !accessToken || !orderId) return;
+    // O Totem é um aparelho compartilhado — depois de pagar, o pedido já
+    // segue por senha e quem avisa "pronto" é o Painel TV, não a própria
+    // tela do Totem (que precisa voltar pro início pro próximo cliente
+    // pedir, não ficar travada esperando).
+    if (!finished || !accessToken || !orderId || isTotem) return;
 
     let cancelled = false;
     let previousKey: string | null = null;
@@ -142,7 +149,21 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [finished, accessToken, orderId]);
+  }, [finished, accessToken, orderId, isTotem]);
+
+  useEffect(() => {
+    if (!finished || !isTotem || !locationId) return;
+
+    // Libera o Totem pro próximo cliente sozinho: limpa o token guardado
+    // (a Comanda já foi fechada no servidor ao confirmar o pagamento,
+    // ver 0026) e recarrega a tela depois de alguns segundos mostrando a
+    // senha — um `reload()` simples já refaz o fluxo inteiro do zero
+    // (abre uma Comanda nova, cardápio limpo, carrinho vazio).
+    window.localStorage.removeItem(tokenStorageKey(locationId));
+    const timer = setTimeout(() => window.location.reload(), TOTEM_RESET_MS);
+
+    return () => clearTimeout(timer);
+  }, [finished, isTotem, locationId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -386,20 +407,43 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
     );
   }
 
-  if (finished) {
-    const isReady = orderStatusKey === "ready";
-
+  if (finished && isTotem) {
     return (
       <main
         translate="no"
         className="notranslate flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
         style={brandStyleVars(brandColor)}
       >
-        <p className="text-2xl">{isReady ? "Pedido pronto! 🎉" : "Pagamento aprovado! ✅"}</p>
+        <p className="text-2xl">Pedido feito! ✅</p>
         {pickupNumber != null && (
           <p className="text-5xl font-extrabold text-brand">Nº {pickupNumber}</p>
         )}
         <p className="text-lg text-muted">
+          Guarde sua senha. Acompanhe a chamada no painel de retirada — quando aparecer, é só
+          retirar no balcão.
+        </p>
+      </main>
+    );
+  }
+
+  if (finished) {
+    const isReady = orderStatusKey === "ready";
+
+    return (
+      <main
+        translate="no"
+        className={`notranslate flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center transition-colors ${
+          isReady ? "animate-pulse bg-brand text-brand-foreground" : ""
+        }`}
+        style={brandStyleVars(brandColor)}
+      >
+        <p className="text-2xl">{isReady ? "Pedido pronto! 🎉" : "Pagamento aprovado! ✅"}</p>
+        {pickupNumber != null && (
+          <p className={`text-5xl font-extrabold ${isReady ? "" : "text-brand"}`}>
+            Nº {pickupNumber}
+          </p>
+        )}
+        <p className={`text-lg ${isReady ? "" : "text-muted"}`}>
           {isReady
             ? "Pode retirar no balcão!"
             : "Preparando seu pedido... fique com a tela aberta, vamos te avisar por aqui quando ficar pronto."}
