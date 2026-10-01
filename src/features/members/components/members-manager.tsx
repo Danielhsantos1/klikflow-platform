@@ -143,15 +143,15 @@ export function MembersManager({ tenantId }: { tenantId: string }) {
         {memberships.map((membership) => (
           <li
             key={membership.id}
-            className="flex items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
-            <div className="flex flex-col">
+            <div className="flex min-w-0 flex-col break-words">
               <span>{membership.full_name ?? "Membro sem nome"}</span>
               <span className="text-xs text-neutral-400">
                 {membership.status === "active" ? "Ativo" : "Suspenso"}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <select
                 className="h-8 rounded-md border border-neutral-200 bg-transparent px-2 text-xs"
                 value={membership.role_id}

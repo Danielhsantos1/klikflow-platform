@@ -482,8 +482,8 @@ export function CatalogManager({
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center justify-between gap-2">
-                      <span>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="min-w-0 break-words">
                         {product.name}
                         {product.categories?.name && (
                           <span className="text-neutral-400"> — {product.categories.name}</span>

@@ -258,11 +258,11 @@ function OrderCard({
       )}
       <ul className="flex flex-col gap-1">
         {order.items.map((item) => (
-          <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
-            <span>
+          <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="min-w-0 break-words">
               {item.quantity}x {item.product_name}
             </span>
-            <span className="flex items-center gap-2">
+            <span className="flex shrink-0 items-center gap-2">
               {(Number(item.unit_price) * item.quantity).toLocaleString("pt-BR", {
                 style: "currency",
                 currency: "BRL",

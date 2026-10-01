@@ -210,7 +210,7 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
         <ul className="flex flex-col gap-2">
           {locations.map((location) => (
             <li key={location.id} className="rounded-md border border-border">
-              <div className="flex items-center justify-between px-3 py-2">
+              <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-sm font-medium">{location.label}</span>
                   {location.openTab && (
@@ -219,7 +219,7 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
                     </Badge>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
