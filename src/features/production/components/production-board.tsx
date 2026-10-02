@@ -29,12 +29,11 @@ type BoardOrder = {
 
 type Stage = "new" | "in_progress" | "ready";
 
-function orderLabel(order: BoardOrder) {
-  const location = order.tabs?.consumption_locations?.label;
-  if (order.pickup_number != null) {
-    return { title: location ?? `Senha ${order.pickup_number}`, badge: `#${order.pickup_number}` };
-  }
-  return { title: location ?? "Pedido", badge: null };
+function orderIdentity(order: BoardOrder) {
+  return {
+    number: order.pickup_number != null ? `#${order.pickup_number}` : "—",
+    location: order.tabs?.consumption_locations?.label ?? null,
+  };
 }
 
 function stageOf(order: BoardOrder): Stage {
@@ -227,18 +226,23 @@ export function ProductionBoard() {
   }
 
   return (
-    <div className="flex w-full flex-col gap-4 px-6 py-10">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Produção</h1>
-          <p className="text-sm text-muted">
-            Pedido já pago, agrupado por etapa. Pense nessa tela aberta o turno inteiro no balcão —
-            preço e total da comanda ficam em Comandas, aqui é só o que falta preparar e entregar.
-          </p>
-        </div>
+    <div className="flex w-full flex-col gap-5 px-6 py-10">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Produção</h1>
         <span className="font-mono text-lg tabular-nums text-muted">
           {new Date(now).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
         </span>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        {columns.map((column) => (
+          <StatChip
+            key={column.stage}
+            label={column.label}
+            count={byStage[column.stage].length}
+            color={column.color}
+          />
+        ))}
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
@@ -272,11 +276,22 @@ export function ProductionBoard() {
   );
 }
 
-const COLUMN_STYLES: Record<string, { header: string; text: string }> = {
-  orange: { header: "bg-[#f97316]", text: "text-[#f97316]" },
-  blue: { header: "bg-[#2563eb]", text: "text-[#2563eb]" },
-  green: { header: "bg-[#16a34a]", text: "text-[#16a34a]" },
+const COLUMN_STYLES: Record<string, { header: string; text: string; dot: string }> = {
+  orange: { header: "bg-[#f97316]", text: "text-[#f97316]", dot: "bg-[#f97316]" },
+  blue: { header: "bg-[#2563eb]", text: "text-[#2563eb]", dot: "bg-[#2563eb]" },
+  green: { header: "bg-[#16a34a]", text: "text-[#16a34a]", dot: "bg-[#16a34a]" },
 };
+
+function StatChip({ label, count, color }: { label: string; count: number; color: string }) {
+  const style = COLUMN_STYLES[color];
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5">
+      <span className={`h-2 w-2 rounded-full ${style.dot}`} />
+      <span className="text-sm font-medium text-muted">{label}</span>
+      <span className="text-sm font-bold tabular-nums">{count}</span>
+    </div>
+  );
+}
 
 function ColumnHeader({ label, hint, color }: { label: string; hint: string; color: string }) {
   const style = COLUMN_STYLES[color];
@@ -303,7 +318,7 @@ function OrderCard({
   onMarkReady: () => void;
   onDeliver: () => void;
 }) {
-  const { title, badge } = orderLabel(order);
+  const { number, location } = orderIdentity(order);
   const elapsedFrom = stage === "ready" ? order.updated_at : order.created_at;
   const minutes = minutesSince(elapsedFrom, now);
   const isLate = minutes >= LATE_AFTER_MIN;
@@ -313,14 +328,12 @@ function OrderCard({
   const style = COLUMN_STYLES[stage === "new" ? "orange" : stage === "in_progress" ? "blue" : "green"];
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border-2 border-border bg-surface p-4 shadow-sm">
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-lg font-bold uppercase leading-tight">{title}</p>
-          {badge && <p className={`text-2xl font-black leading-tight ${style.text}`}>{badge}</p>}
-          {order.customer_name && title !== order.customer_name && (
-            <p className="text-xs text-muted">{order.customer_name}</p>
-          )}
+          <p className={`text-2xl font-black leading-tight ${style.text}`}>{number}</p>
+          {order.customer_name && <p className="text-base font-bold leading-tight">{order.customer_name}</p>}
+          {location && <p className="text-sm text-muted">{location}</p>}
         </div>
         <span
           className={`shrink-0 font-mono text-sm font-bold tabular-nums ${
@@ -350,20 +363,13 @@ function OrderCard({
       )}
 
       {stage === "new" && (
-        <div className="flex flex-col gap-1">
-          <Button
-            size="lg"
-            className="w-full bg-[#f97316] text-white hover:bg-[#ea580c]"
-            onClick={hasStations ? onStart : onMarkReady}
-          >
-            {hasStations ? "Iniciar produção" : "Marcar como pronto"}
-          </Button>
-          {!hasStations && (
-            <p className="text-center text-xs text-muted">
-              Sem item de preparo — clique quando estiver separado pra avisar o cliente
-            </p>
-          )}
-        </div>
+        <Button
+          size="lg"
+          className="w-full bg-[#f97316] text-white hover:bg-[#ea580c]"
+          onClick={hasStations ? onStart : onMarkReady}
+        >
+          {hasStations ? "Iniciar produção" : "Marcar como pronto"}
+        </Button>
       )}
       {stage === "in_progress" && (
         <Button size="lg" className="w-full bg-[#2563eb] text-white hover:bg-[#1d4ed8]" onClick={onMarkReady}>
