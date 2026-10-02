@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 import { createDbClient } from "@/lib/db/client";
-import { confirmOrderPayment } from "@/features/orders/confirm-payment";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CategoryPills } from "@/components/pos/category-pills";
@@ -116,7 +115,6 @@ export function TabPanel({
           order={order}
           products={products}
           categories={categories}
-          tenantId={tab.tenant_id}
           onChanged={reload}
         />
       ))}
@@ -150,31 +148,16 @@ function OrderCard({
   order,
   products,
   categories,
-  tenantId,
   onChanged,
 }: {
   order: OrderWithItems;
   products: Product[];
   categories: Category[];
-  tenantId: string;
   onChanged: () => Promise<void>;
 }) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  async function handleConfirmPayment() {
-    setError(null);
-
-    const { error: confirmError } = await confirmOrderPayment(tenantId, order.id);
-
-    if (confirmError) {
-      setError(confirmError);
-      return;
-    }
-
-    await onChanged();
-  }
 
   async function handleAddProduct(product: Product) {
     setError(null);
@@ -228,18 +211,10 @@ function OrderCard({
           <Badge variant={order.order_statuses?.key === "awaiting_payment" ? "warning" : "neutral"}>
             {order.order_statuses?.label ?? "—"}
           </Badge>
-          {order.order_statuses?.key === "awaiting_payment" && (
-            <Button size="sm" onClick={handleConfirmPayment}>
-              Confirmar pagamento
-            </Button>
-          )}
         </div>
       </div>
       {order.order_statuses?.key === "awaiting_payment" && (
-        <p className="mb-2 text-xs text-muted">
-          Cliente lançou esse pedido pelo QR Code/Totem e ainda não pagou — clique “Confirmar
-          pagamento” quando ele pagar no balcão pra liberar pra produção.
-        </p>
+        <p className="mb-2 text-xs text-muted">Aguardando pagamento — receba no Caixa.</p>
       )}
       {order.order_statuses?.key === "new" && (
         <p className="mb-2 text-xs text-muted">Pago — acompanhe o preparo em Produção.</p>
