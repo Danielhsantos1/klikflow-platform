@@ -17,30 +17,41 @@ type ReadyOrder = {
 const POLL_MS = 5000;
 const NEWLY_READY_MS = 8000;
 
-const CHANNEL_BADGE: Record<string, { label: string; className: string }> = {
-  totem: { label: "TOTEM", className: "bg-[#4db6ac]" },
-  qr_code: { label: "NA MESA", className: "bg-[#ff9800]" },
-  tablet_mesa: { label: "TABLET NA MESA", className: "bg-[#8d6e63]" },
-  staff: { label: "RETIRADA", className: "bg-[#1a1a1a]" },
+/**
+ * Como o pedido chegou define onde o cliente vai buscá-lo — nunca mais
+ * "NA MESA" genérico. `staff`/`totem` são retirada no balcão (totem é
+ * autoatendimento, não tem garçom pra levar); `qr_code`/`tablet_mesa`
+ * são uma mesa de verdade, a equipe entrega lá.
+ */
+const PICKUP_INSTRUCTION: Record<string, string> = {
+  totem: "RETIRE NO BALCÃO",
+  staff: "RETIRE NO BALCÃO",
+  qr_code: "ENTREGAREMOS NA MESA",
+  tablet_mesa: "ENTREGAREMOS NA MESA",
 };
 
 /**
  * Painel público de chamada (Etapa 4/N do fluxo Totem/Tablet com
- * senha) — pensado pra ficar numa TV do balcão, sem login. Lê só o
- * necessário via `list_ready_orders()` (SECURITY DEFINER, 0021/0024),
- * nunca o pedido inteiro — mesmo padrão de leitura pública já usado no
- * cardápio (0014).
+ * senha) — pensado pra ficar numa TV/monitor no balcão, sem login,
+ * lido a vários metros de distância. É uma experiência deliberadamente
+ * diferente da tela operacional de Produção (que pode ter detalhe) e
+ * da tela do cliente no celular: aqui só o essencial pra alguém
+ * reconhecer o próprio pedido rápido — número (dominante), nome,
+ * status e onde retirar. Nunca item, preço ou qualquer dado interno.
  *
- * Um pedido que acabou de virar "Pronto" pisca em verde por
- * `NEWLY_READY_MS` pra chamar atenção, depois se acomoda no visual
- * padrão da lista — sem isso, um pedido novo se perderia no meio dos
- * que já estão esperando há mais tempo.
+ * Lê só o necessário via `list_ready_orders()` (SECURITY DEFINER,
+ * 0021/0024/0028), nunca o pedido inteiro — mesmo padrão de leitura
+ * pública já usado no cardápio (0014).
  *
- * Tocar num pedido chama `mark_order_delivered()` (0027) e some da
- * lista na hora (otimista, antes da resposta) — sem isso a lista só
- * crescia pra sempre, já que nada nunca tirava um pedido "Pronto" dali.
- * `list_ready_orders` também para de trazer um pedido com mais de 30min
- * como rede de segurança, caso ninguém toque nele, e mostra no máximo
+ * Um pedido que acabou de virar "Pronto" pisca por `NEWLY_READY_MS`
+ * pra chamar atenção, depois se acomoda no visual padrão do card —
+ * sem isso, um pedido novo se perderia no meio dos que já esperam há
+ * mais tempo.
+ *
+ * Tocar num card chama `mark_order_delivered()` (0027) e some da tela
+ * na hora (otimista, antes da resposta) — pedido retirado nunca fica
+ * visível pro público. `list_ready_orders` também para de trazer um
+ * pedido com mais de 30min como rede de segurança, e mostra no máximo
  * 10 de cada vez (0028) — o próximo da fila entra sozinho assim que um
  * sai, porque a lista inteira é recalculada a cada poll.
  */
@@ -48,6 +59,7 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
   const [tenantName, setTenantName] = useState<string | null>(null);
   const [orders, setOrders] = useState<ReadyOrder[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
   const [newlyReadyIds, setNewlyReadyIds] = useState<Set<string>>(new Set());
   const knownIds = useRef<Set<string>>(new Set());
 
@@ -102,6 +114,11 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
     };
   }, [tenantId]);
 
+  useEffect(() => {
+    const clock = setInterval(() => setNow(new Date()), 15000);
+    return () => clearInterval(clock);
+  }, []);
+
   async function handleDismiss(orderId: string) {
     setOrders((current) => current.filter((order) => order.order_id !== orderId));
 
@@ -116,72 +133,79 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
   }
 
   return (
-    <main className="flex min-h-screen flex-col gap-8 bg-foreground px-6 py-10 text-background sm:px-10">
-      <header className="flex items-baseline justify-between">
+    <main className="flex min-h-screen flex-col gap-10 bg-[#0b0d10] px-6 py-10 text-white sm:px-12">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-widest opacity-60">KlikFlow · Retirada</p>
-          <h1 className="text-4xl font-extrabold">{tenantName ?? "..."}</h1>
+          <p className="text-sm uppercase tracking-[0.2em] text-white/50">{tenantName ?? "KlikFlow"}</p>
+          <h1 className="text-3xl font-extrabold uppercase tracking-tight sm:text-4xl">
+            Pedidos prontos para retirada
+          </h1>
+          <p className="mt-1 text-base text-white/60">
+            Seu pedido aparecerá aqui quando estiver pronto.
+          </p>
         </div>
-        <p className="text-2xl font-mono opacity-70">
-          {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-        </p>
+        <div className="flex flex-col items-end gap-1">
+          <span className="font-mono text-xl tabular-nums text-white/70 sm:text-2xl">
+            {now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+          <span className="rounded-full bg-white/10 px-4 py-1 text-sm font-bold uppercase tracking-wide text-white/80">
+            Pedidos prontos ({orders.length})
+          </span>
+        </div>
       </header>
 
       {error && <p className="text-danger">{error}</p>}
 
-      <section className="flex flex-col gap-4">
-        <div>
-          <p className="text-lg font-semibold uppercase tracking-wide text-brand">
-            Pedidos prontos para retirada
+      {orders.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-20 text-center">
+          <span className="text-6xl">☕</span>
+          <p className="text-2xl font-bold">Tudo certo por aqui!</p>
+          <p className="text-lg text-white/60">
+            Assim que seu pedido estiver pronto ele aparecerá nesta tela.
           </p>
-          <p className="text-sm opacity-60">Toque num pedido pra tirar da lista ao entregar.</p>
         </div>
-        {orders.length === 0 ? (
-          <p className="text-xl opacity-50">Nenhum pedido pronto no momento.</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {orders.map((order) => {
-              const isNew = newlyReadyIds.has(order.order_id);
-              const badge = CHANNEL_BADGE[order.channel] ?? {
-                label: order.channel.toUpperCase(),
-                className: "bg-[#1a1a1a]",
-              };
+      ) : (
+        <div className="grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          {orders.map((order) => {
+            const isNew = newlyReadyIds.has(order.order_id);
+            const instruction = PICKUP_INSTRUCTION[order.channel] ?? "RETIRE NO BALCÃO";
 
-              return (
-                <button
-                  key={order.order_id}
-                  type="button"
-                  onClick={() => handleDismiss(order.order_id)}
-                  className={`flex items-center justify-between gap-4 rounded-2xl border-2 border-black/40 px-6 py-6 text-left transition-opacity active:opacity-70 sm:px-8 ${
-                    isNew ? "animate-pulse bg-[#2ecf8b] text-[#0d0d0c]" : "bg-white/10"
+            return (
+              <button
+                key={order.order_id}
+                type="button"
+                onClick={() => handleDismiss(order.order_id)}
+                className={`flex flex-col items-center gap-3 rounded-3xl border-2 px-6 py-8 text-center transition-colors active:opacity-70 ${
+                  isNew
+                    ? "animate-pulse border-[#2ecf8b] bg-[#2ecf8b] text-[#07140d]"
+                    : "border-white/10 bg-white/[0.06]"
+                }`}
+              >
+                <span className="font-mono text-7xl font-black leading-none tabular-nums sm:text-8xl">
+                  {order.pickup_number != null ? `#${order.pickup_number.toString().padStart(2, "0")}` : "—"}
+                </span>
+                <span className="text-2xl font-bold uppercase tracking-wide sm:text-3xl">
+                  {order.customer_name ?? order.location_label}
+                </span>
+                <span
+                  className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-extrabold uppercase tracking-wide sm:text-base ${
+                    isNew ? "bg-[#07140d]/15 text-[#07140d]" : "bg-[#16a34a]/20 text-[#4ade80]"
                   }`}
                 >
-                  <span
-                    className={`min-w-[80px] text-4xl font-black sm:text-5xl ${
-                      isNew ? "text-[#0d0d0c]" : "text-brand"
-                    }`}
-                  >
-                    {order.pickup_number != null ? `#${order.pickup_number}` : "—"}
-                  </span>
-                  <span className="flex flex-1 flex-col">
-                    <span className="text-xl font-bold uppercase sm:text-3xl">
-                      {order.customer_name ?? order.location_label}
-                    </span>
-                    <span className="text-sm font-semibold uppercase tracking-wide opacity-70 sm:text-base">
-                      Retirar no balcão
-                    </span>
-                  </span>
-                  <span
-                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white sm:px-4 sm:py-2 sm:text-base ${badge.className}`}
-                  >
-                    {badge.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                  ✓ Pronto
+                </span>
+                <span
+                  className={`text-sm font-semibold uppercase tracking-wide sm:text-base ${
+                    isNew ? "text-[#07140d]/80" : "text-white/60"
+                  }`}
+                >
+                  {instruction}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </main>
   );
 }
