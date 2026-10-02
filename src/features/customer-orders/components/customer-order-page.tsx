@@ -75,10 +75,17 @@ function playReadyChime() {
  * header — never `createDbClient()`, which always attaches whatever
  * staff session cookie the browser happens to have.
  *
- * "Pagamento aprovado" is simulated (no real gateway yet, decisão da
- * Tarefa 5/N) — `confirm_customer_payment()` just moves the order out of
- * `awaiting_payment`, which is what actually releases it to the
- * kitchen/production board (Etapa 1/N do fluxo Totem/Tablet com senha).
+ * Pagamento só existe de verdade pro Totem aqui (simulado, sem gateway
+ * real ainda) — `confirm_customer_payment()` move o pedido pra fora de
+ * `awaiting_payment` e fecha a Comanda na hora (0026), porque é um
+ * aparelho compartilhado e o pedido já segue por senha.
+ *
+ * QR Code e Tablet na Mesa NÃO pagam aqui (reestruturação do fluxo de
+ * pagamento): cada item já vai pra produção assim que entra no
+ * carrinho (`default_order_status()`, 0035, já cria o pedido direto em
+ * "Novo" pra esses canais) e o cliente pode pedir quantas vezes
+ * quiser — o pagamento de tudo junto só acontece no Caixa, quando ele
+ * for embora.
  */
 type CustomerOrderPageProps =
   | { mode?: "customer"; locationId: string; channel: CustomerChannel }
@@ -476,6 +483,56 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
       }, {}),
     );
     const checkoutTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+
+    // QR Code e Tablet na Mesa não pagam aqui — os itens já foram pra
+    // cozinha assim que entraram no carrinho (cada toque já chama
+    // add_customer_order_item). Essa tela é só uma conferência da
+    // comanda até agora; o cliente pode voltar e pedir mais à vontade.
+    // O pagamento de verdade acontece só no Caixa, quando for embora.
+    if (!isTotem) {
+      return (
+        <main
+          translate="no"
+          className="notranslate flex flex-1 flex-col items-center gap-6 bg-[#F9F6F0] px-6 py-10 text-center text-[#1A1A1A]"
+          style={brandStyleVars(brandColor)}
+        >
+          <p className="text-2xl">Sua comanda até agora</p>
+
+          <div className="flex w-full max-w-sm flex-col gap-2 text-left">
+            {checkoutLines.map((line) => (
+              <div key={line.key} className="flex items-start justify-between gap-2 text-sm">
+                <span>
+                  {line.quantity} {line.name}
+                </span>
+                <span className="flex items-center gap-2 text-[#666666]">
+                  {formatBRL(line.unitPrice * line.quantity)}
+                  <button
+                    onClick={() => handleRemoveFromCart(line.key)}
+                    className="text-danger hover:underline"
+                    aria-label={`Remover uma unidade de ${line.name}`}
+                  >
+                    −
+                  </button>
+                </span>
+              </div>
+            ))}
+            {checkoutLines.length === 0 && (
+              <p className="text-sm text-[#666666]">Nenhum item ainda.</p>
+            )}
+          </div>
+
+          <p className="text-lg font-semibold">Total até agora: {formatBRL(checkoutTotal)}</p>
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <p className="text-sm text-[#666666]">
+            Peça mais sempre que quiser. Quando for embora, procure o Caixa pra pagar (ou chame um
+            atendente na mesa).
+          </p>
+          <Button size="lg" onClick={() => setCheckingOut(false)}>
+            Continuar pedindo
+          </Button>
+        </main>
+      );
+    }
 
     return (
       <main
