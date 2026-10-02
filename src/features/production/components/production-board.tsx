@@ -37,7 +37,9 @@ function orderIdentity(order: BoardOrder) {
 }
 
 function stageOf(order: BoardOrder): Stage {
-  if (order.order_statuses?.key === "ready") return "ready";
+  const key = order.order_statuses?.key;
+  if (key === "ready") return "ready";
+  if (key === "in_production") return "in_progress";
 
   const stations = order.order_items.flatMap((item) => item.order_item_stations);
   if (stations.length === 0) return "new";
@@ -69,8 +71,8 @@ async function fetchBoard() {
 
   if (error) return { error: error.message };
 
-  const orders = ((data as unknown as BoardOrder[]) ?? []).filter(
-    (order) => order.order_statuses?.key === "new" || order.order_statuses?.key === "ready",
+  const orders = ((data as unknown as BoardOrder[]) ?? []).filter((order) =>
+    ["new", "in_production", "ready"].includes(order.order_statuses?.key ?? ""),
   );
 
   return { orders };
@@ -84,14 +86,17 @@ async function fetchBoard() {
  *
  *   Novo → Em Produção → Pronto → (Entregue, some do quadro)
  *
- * Um pedido sem nenhum produto vinculado a Estação de Produção não tem
- * "Em Produção" pra passar (não tem o que preparar de verdade) — o card
- * já nasce em Novo com um botão "Marcar como pronto" direto, sem etapa
- * inventada. Quando TEM estação, "Iniciar produção" avança todos os
- * itens pendentes pra `in_progress`; "Marcar como pronto" conclui os
- * que faltam — e esse UPDATE em `order_item_stations` já dispara o
- * trigger existente (0018) que avança o pedido pra "Pronto" sozinho
- * assim que o último item termina.
+ * Regra de negócio: nenhum pedido pula direto de Novo pra Pronto, nem
+ * mesmo um sem item vinculado a Estação de Produção. Quando o pedido
+ * TEM estação, "Iniciar produção" avança os itens pendentes pra
+ * `in_progress` em `order_item_stations`, e "Marcar como pronto" conclui
+ * os que faltam — esse UPDATE já dispara o trigger existente (0018) que
+ * avança o pedido pra "Pronto" sozinho quando o último item termina.
+ * Quando o pedido NÃO tem nenhum item com estação (nada em
+ * `order_item_stations` pra avançar), "Iniciar produção"/"Marcar como
+ * pronto" escrevem direto no status do pedido (`in_production`/`ready`,
+ * 0030) — dois status que já existiam desde `create_tenant()` mas nunca
+ * tinham uso real.
  */
 export function ProductionBoard() {
   const [orders, setOrders] = useState<BoardOrder[]>([]);
@@ -130,7 +135,11 @@ export function ProductionBoard() {
     return () => clearInterval(clock);
   }, []);
 
-  async function withStatus(key: "ready" | "delivered", orderId: string, tenantId: string) {
+  async function withStatus(
+    key: "in_production" | "ready" | "delivered",
+    orderId: string,
+    tenantId: string,
+  ) {
     const db = createDbClient();
     const { data: status, error: statusError } = await db
       .from("order_statuses")
@@ -159,7 +168,14 @@ export function ProductionBoard() {
       .filter((s) => s.status === "pending")
       .map((s) => s.id);
 
-    if (pendingIds.length === 0) return;
+    if (pendingIds.length === 0) {
+      // Sem item com Estação vinculada - não tem order_item_stations pra
+      // avançar, então marca o pedido como "Em Produção" direto (status
+      // já existia no banco desde sempre, só nunca tinha uso real).
+      await withStatus("in_production", order.id, order.tenant_id);
+      await reload();
+      return;
+    }
 
     const db = createDbClient();
     const { error: updateError } = await db
@@ -322,7 +338,6 @@ function OrderCard({
   const elapsedFrom = stage === "ready" ? order.updated_at : order.created_at;
   const minutes = minutesSince(elapsedFrom, now);
   const isLate = minutes >= LATE_AFTER_MIN;
-  const hasStations = order.order_items.some((item) => item.order_item_stations.length > 0);
   const notes = order.order_items.filter((item) => item.notes).map((item) => item.notes as string);
 
   const style = COLUMN_STYLES[stage === "new" ? "orange" : stage === "in_progress" ? "blue" : "green"];
@@ -363,12 +378,8 @@ function OrderCard({
       )}
 
       {stage === "new" && (
-        <Button
-          size="lg"
-          className="w-full bg-[#f97316] text-white hover:bg-[#ea580c]"
-          onClick={hasStations ? onStart : onMarkReady}
-        >
-          {hasStations ? "Iniciar produção" : "Marcar como pronto"}
+        <Button size="lg" className="w-full bg-[#f97316] text-white hover:bg-[#ea580c]" onClick={onStart}>
+          Iniciar produção
         </Button>
       )}
       {stage === "in_progress" && (
