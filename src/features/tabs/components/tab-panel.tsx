@@ -191,6 +191,35 @@ function OrderCard({
     await onChanged();
   }
 
+  async function handleReleaseOrder() {
+    setError(null);
+    const db = createDbClient();
+
+    const { data: readyStatus, error: statusError } = await db
+      .from("order_statuses")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("key", "ready")
+      .maybeSingle();
+
+    if (statusError || !readyStatus) {
+      setError(statusError?.message ?? "Status 'Pronto' não configurado para esta empresa.");
+      return;
+    }
+
+    const { error: updateError } = await db
+      .from("orders")
+      .update({ status_id: readyStatus.id })
+      .eq("id", order.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    await onChanged();
+  }
+
   async function handleAddProduct(product: Product) {
     setError(null);
 
@@ -248,12 +277,24 @@ function OrderCard({
               Confirmar pagamento
             </Button>
           )}
+          {order.order_statuses?.key === "new" && (
+            <Button size="sm" onClick={handleReleaseOrder}>
+              Liberar pedido
+            </Button>
+          )}
         </div>
       </div>
       {order.order_statuses?.key === "awaiting_payment" && (
         <p className="mb-2 text-xs text-muted">
           Cliente lançou esse pedido pelo QR Code/Totem e ainda não pagou — clique “Confirmar
           pagamento” quando ele pagar no balcão pra liberar pra produção.
+        </p>
+      )}
+      {order.order_statuses?.key === "new" && (
+        <p className="mb-2 text-xs text-muted">
+          Pago e lançado. Se tiver item que passa por uma Estação de Produção, ele some sozinho
+          daqui quando a Produção concluir tudo. Se não precisar de preparo, clique “Liberar
+          pedido” quando estiver pronto pra retirada — só aí ele aparece no Painel TV.
         </p>
       )}
       <ul className="flex flex-col gap-1">
