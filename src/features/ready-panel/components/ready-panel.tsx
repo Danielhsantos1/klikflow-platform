@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { anonRpc, anonRpcList, anonSelect } from "@/lib/db/anonymous";
+import { anonRpcList, anonSelect } from "@/lib/db/anonymous";
 import type { Tenant } from "@/types/tenant";
 
 type ReadyOrder = {
@@ -91,12 +91,13 @@ const PICKUP_INSTRUCTION: Record<string, string> = {
  * sem isso, um pedido novo se perderia no meio dos que já esperam há
  * mais tempo.
  *
- * Tocar num card chama `mark_order_delivered()` (0027) e some da tela
- * na hora (otimista, antes da resposta) — pedido retirado nunca fica
- * visível pro público. `list_ready_orders` também para de trazer um
- * pedido com mais de 30min como rede de segurança, e mostra no máximo
- * 10 de cada vez (0028) — o próximo da fila entra sozinho assim que um
- * sai, porque a lista inteira é recalculada a cada poll.
+ * Painel 100% informativo (0032): ninguém marca "Entregue" tocando a
+ * TV — isso é responsabilidade exclusiva da equipe em Produção. Um
+ * pedido só sai daqui quando o status dele muda pra "delivered" (feito
+ * em Produção) ou pela rede de segurança de 30min do `list_ready_orders`
+ * (0027/0028), que também limita a 10 por vez — o próximo da fila entra
+ * sozinho assim que um sai, porque a lista inteira é recalculada a cada
+ * poll.
  */
 export function ReadyPanel({ tenantId }: { tenantId: string }) {
   const [tenantName, setTenantName] = useState<string | null>(null);
@@ -162,19 +163,6 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
     return () => clearInterval(clock);
   }, []);
 
-  async function handleDismiss(orderId: string) {
-    setOrders((current) => current.filter((order) => order.order_id !== orderId));
-
-    const { error: dismissError } = await anonRpc<void>("mark_order_delivered", {
-      p_tenant_id: tenantId,
-      p_order_id: orderId,
-    });
-
-    if (dismissError) {
-      setError(dismissError);
-    }
-  }
-
   const size = GRID_DENSITY[densityOf(orders.length)];
 
   return (
@@ -216,11 +204,9 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
             const instruction = PICKUP_INSTRUCTION[order.channel] ?? "RETIRE NO BALCÃO";
 
             return (
-              <button
+              <div
                 key={order.order_id}
-                type="button"
-                onClick={() => handleDismiss(order.order_id)}
-                className={`flex flex-col items-center gap-2 rounded-3xl border-2 text-center transition-colors active:opacity-70 ${size.pad} ${
+                className={`flex flex-col items-center gap-2 rounded-3xl border-2 text-center transition-colors ${size.pad} ${
                   isNew
                     ? "animate-pulse border-[#2ecf8b] bg-[#2ecf8b] text-[#07140d]"
                     : "border-white/10 bg-white/[0.06]"
@@ -246,7 +232,7 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
                 >
                   {instruction}
                 </span>
-              </button>
+              </div>
             );
           })}
         </div>
