@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { createDbClient } from "@/lib/db/client";
+import { confirmOrderPayment } from "@/features/orders/confirm-payment";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CategoryPills } from "@/components/pos/category-pills";
@@ -164,27 +165,11 @@ function OrderCard({
 
   async function handleConfirmPayment() {
     setError(null);
-    const db = createDbClient();
 
-    const { data: newStatus, error: statusError } = await db
-      .from("order_statuses")
-      .select("id")
-      .eq("tenant_id", tenantId)
-      .eq("key", "new")
-      .maybeSingle();
+    const { error: confirmError } = await confirmOrderPayment(tenantId, order.id);
 
-    if (statusError || !newStatus) {
-      setError(statusError?.message ?? "Status 'Novo' não configurado para esta empresa.");
-      return;
-    }
-
-    const { error: updateError } = await db
-      .from("orders")
-      .update({ status_id: newStatus.id })
-      .eq("id", order.id);
-
-    if (updateError) {
-      setError(updateError.message);
+    if (confirmError) {
+      setError(confirmError);
       return;
     }
 

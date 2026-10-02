@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { createDbClient } from "@/lib/db/client";
+import { confirmOrderPayment } from "@/features/orders/confirm-payment";
 import { Button } from "@/components/ui/button";
 
 const POLL_MS = 5000;
@@ -106,29 +107,12 @@ export function CashierBoard() {
     setError(null);
     setConfirming(true);
 
-    const db = createDbClient();
-    const { data: newStatus, error: statusError } = await db
-      .from("order_statuses")
-      .select("id")
-      .eq("tenant_id", selected.tenant_id)
-      .eq("key", "new")
-      .maybeSingle();
-
-    if (statusError || !newStatus) {
-      setError(statusError?.message ?? "Status 'Novo' não configurado para esta empresa.");
-      setConfirming(false);
-      return;
-    }
-
-    const { error: updateError } = await db
-      .from("orders")
-      .update({ status_id: newStatus.id })
-      .eq("id", selected.id);
+    const { error: confirmError } = await confirmOrderPayment(selected.tenant_id, selected.id);
 
     setConfirming(false);
 
-    if (updateError) {
-      setError(updateError.message);
+    if (confirmError) {
+      setError(confirmError);
       return;
     }
 
