@@ -496,7 +496,8 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
           className="notranslate flex flex-1 flex-col items-center gap-6 bg-[#F9F6F0] px-6 py-10 text-center text-[#1A1A1A]"
           style={brandStyleVars(brandColor)}
         >
-          <p className="text-2xl">Sua comanda até agora</p>
+          <p className="text-2xl">Pedido enviado! ✅</p>
+          <p className="text-base text-[#666666]">Já está a caminho da cozinha.</p>
 
           <div className="flex w-full max-w-sm flex-col gap-2 text-left">
             {checkoutLines.map((line) => (
@@ -788,7 +789,7 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
             className="bg-brand-foreground text-brand hover:opacity-90"
             onClick={() => setCheckingOut(true)}
           >
-            Ver pedido
+            {isTotem ? "Ver pedido" : "Enviar pedido"}
           </Button>
         </div>
       )}
