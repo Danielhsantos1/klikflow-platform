@@ -3,12 +3,10 @@
 import { useEffect, useState } from "react";
 
 import { createDbClient } from "@/lib/db/client";
-import { confirmOrderPayment } from "@/features/orders/confirm-payment";
+import { confirmOrderPayment, type PaymentMethod } from "@/features/orders/confirm-payment";
 import { Button } from "@/components/ui/button";
 
 const POLL_MS = 5000;
-
-type PaymentMethod = "cash" | "pix" | "debit" | "credit";
 
 const PAYMENT_METHODS: { key: PaymentMethod; label: string }[] = [
   { key: "cash", label: "Dinheiro" },
@@ -61,10 +59,8 @@ async function fetchPending() {
  * já existia em Comandas ("Confirmar pagamento"), só que numa tela
  * dedicada pro caixa em vez de misturada com a gestão da mesa.
  *
- * A forma de pagamento (Dinheiro/PIX/Débito/Crédito) é só pra guiar o
- * atendente na hora de cobrar — não existe coluna no banco pra isso
- * ainda, então ela não fica salva pra relatório. Se precisar disso no
- * futuro, dá pra adicionar uma coluna em `orders` depois.
+ * A forma de pagamento (Dinheiro/PIX/Débito/Crédito) fica salva em
+ * `orders.payment_method` (0033) pra relatório futuro.
  */
 export function CashierBoard() {
   const [orders, setOrders] = useState<PendingOrder[]>([]);
@@ -103,11 +99,11 @@ export function CashierBoard() {
   const selected = orders.find((order) => order.id === selectedId) ?? orders[0] ?? null;
 
   async function handleReceivePayment() {
-    if (!selected) return;
+    if (!selected || !method) return;
     setError(null);
     setConfirming(true);
 
-    const { error: confirmError } = await confirmOrderPayment(selected.tenant_id, selected.id);
+    const { error: confirmError } = await confirmOrderPayment(selected.tenant_id, selected.id, method);
 
     setConfirming(false);
 

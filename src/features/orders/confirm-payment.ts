@@ -1,14 +1,20 @@
 import { createDbClient } from "@/lib/db/client";
 
+export type PaymentMethod = "cash" | "pix" | "debit" | "credit";
+
 /**
  * Confirma o pagamento de um pedido "Aguardando pagamento" e libera
  * pra produção (status_id -> "new"). Usada tanto por Comandas quanto
  * por Caixa - antes cada tela reimplementava isso de forma idêntica;
  * centralizado aqui pra ter um único ponto de verdade.
+ *
+ * `paymentMethod` é opcional (Comandas não pede, só Caixa) - quando
+ * informado, fica salvo em `orders.payment_method` pra relatório.
  */
 export async function confirmOrderPayment(
   tenantId: string,
   orderId: string,
+  paymentMethod?: PaymentMethod,
 ): Promise<{ error: string | null }> {
   const db = createDbClient();
 
@@ -25,7 +31,10 @@ export async function confirmOrderPayment(
 
   const { error: updateError } = await db
     .from("orders")
-    .update({ status_id: newStatus.id })
+    .update({
+      status_id: newStatus.id,
+      ...(paymentMethod ? { payment_method: paymentMethod } : {}),
+    })
     .eq("id", orderId);
 
   if (updateError) {
