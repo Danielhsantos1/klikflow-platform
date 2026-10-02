@@ -171,25 +171,6 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
     await reload();
   }
 
-  async function handleCloseTab(tabId: string) {
-    if (!userId) return;
-    setError(null);
-
-    const db = createDbClient();
-    const { error: updateError } = await db
-      .from("tabs")
-      .update({ status: "closed", closed_by: userId, closed_at: new Date().toISOString() })
-      .eq("id", tabId);
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-
-    setExpandedLocationId(null);
-    await reload();
-  }
-
   if (loading) {
     return <p className="text-neutral-500">Carregando comandas...</p>;
   }
@@ -282,7 +263,6 @@ export function OperationsBoard({ tenantId }: { tenantId: string }) {
                     products={products}
                     categories={categories}
                     userId={userId ?? ""}
-                    onCloseTab={() => handleCloseTab(location.openTab!.id)}
                   />
                 </div>
               )}

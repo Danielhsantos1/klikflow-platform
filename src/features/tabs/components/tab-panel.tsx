@@ -43,13 +43,11 @@ export function TabPanel({
   products,
   categories,
   userId,
-  onCloseTab,
 }: {
   tab: Tab;
   products: Product[];
   categories: Category[];
   userId: string;
-  onCloseTab: () => void;
 }) {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,13 +129,11 @@ export function TabPanel({
           {tabTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
         </span>
       </div>
+      <p className="text-xs text-muted">Fechar a comanda e receber o pagamento é só no Caixa.</p>
 
       <div className="flex justify-between">
         <Button variant="outline" size="sm" onClick={handleNewOrder}>
           Novo pedido
-        </Button>
-        <Button variant="outline" size="sm" onClick={onCloseTab}>
-          Fechar comanda
         </Button>
       </div>
     </div>
