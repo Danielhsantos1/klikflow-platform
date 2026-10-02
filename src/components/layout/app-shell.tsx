@@ -19,12 +19,9 @@ export type NavSection = {
 
 function Logo() {
   return (
-    <div className="flex flex-col">
-      <span className="text-lg font-extrabold tracking-tight">
-        Klik<span className="text-brand">Flow</span>
-      </span>
-      <span className="text-[0.65rem] font-medium text-muted">Simples. Ágil. Conforme.</span>
-    </div>
+    <span className="text-lg font-extrabold tracking-tight">
+      Klik<span className="text-brand">Flow</span>
+    </span>
   );
 }
 
