@@ -87,16 +87,15 @@ async function fetchBoard() {
  *   Novo → Em Produção → Pronto → (Entregue, some do quadro)
  *
  * Regra de negócio: nenhum pedido pula direto de Novo pra Pronto, nem
- * mesmo um sem item vinculado a Estação de Produção. Quando o pedido
- * TEM estação, "Iniciar produção" avança os itens pendentes pra
- * `in_progress` em `order_item_stations`, e "Marcar como pronto" conclui
- * os que faltam — esse UPDATE já dispara o trigger existente (0018) que
- * avança o pedido pra "Pronto" sozinho quando o último item termina.
- * Quando o pedido NÃO tem nenhum item com estação (nada em
- * `order_item_stations` pra avançar), "Iniciar produção"/"Marcar como
- * pronto" escrevem direto no status do pedido (`in_production`/`ready`,
- * 0030) — dois status que já existiam desde `create_tenant()` mas nunca
- * tinham uso real.
+ * mesmo um sem item vinculado a Estação de Produção — `status_id` do
+ * pedido sempre passa de verdade por "in_production" (0030/0034), tenha
+ * ou não estação. Quando TEM estação, "Iniciar produção" avança os itens
+ * pendentes pra `in_progress` em `order_item_stations` E move o pedido
+ * pra "in_production"; "Marcar como pronto" conclui os itens que faltam
+ * — esse UPDATE dispara o trigger (0018/0034) que avança o pedido pra
+ * "Pronto" sozinho quando o último item termina. Quando NÃO tem estação
+ * nenhuma (nada em `order_item_stations` pra avançar), "Iniciar
+ * produção"/"Marcar como pronto" escrevem direto no status do pedido.
  */
 export function ProductionBoard() {
   const [orders, setOrders] = useState<BoardOrder[]>([]);
@@ -177,6 +176,11 @@ export function ProductionBoard() {
       return;
     }
 
+    // Pedido TEM estação: avança os itens pendentes pra "in_progress" e
+    // move o status do pedido pra "in_production" também (0034) - antes
+    // só os itens avançavam e o pedido ficava preso em "new" até o
+    // trigger de banco tentar pular direto pra "ready" sozinho, o que
+    // quebrou quando a 0031 removeu a aresta new->ready.
     const db = createDbClient();
     const { error: updateError } = await db
       .from("order_item_stations")
@@ -188,6 +192,7 @@ export function ProductionBoard() {
       return;
     }
 
+    await withStatus("in_production", order.id, order.tenant_id);
     await reload();
   }
 
