@@ -448,6 +448,18 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
             ? "Pode retirar no balcão!"
             : "Preparando seu pedido... fique com a tela aberta, vamos te avisar por aqui quando ficar pronto."}
         </p>
+        <Button
+          variant={isReady ? "secondary" : "outline"}
+          className={isReady ? "bg-brand-foreground text-brand hover:opacity-90" : undefined}
+          onClick={() => {
+            setFinished(false);
+            setOrderStatusKey(null);
+            setOrderId(null);
+            setCart([]);
+          }}
+        >
+          Pedir mais
+        </Button>
       </main>
     );
   }
