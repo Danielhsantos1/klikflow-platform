@@ -508,11 +508,13 @@ export interface Database {
           created_by: string;
           customer_name: string | null;
           pickup_number: number | null;
+          paid_at: string | null;
+          payment_method: "cash" | "pix" | "debit" | "credit" | null;
           created_at: string;
           updated_at: string;
         };
-        // status_id may be omitted: set_default_order_status() fills in
-        // the tenant's lowest-`sequence` order_statuses row when absent.
+        // status_id may be omitted: default_order_status() (0035) picks
+        // "awaiting_payment" for canal totem ou "new" para os demais.
         // pickup_number is never set by the client — assign_pickup_number()
         // (0018) fills it in when the order leaves `awaiting_payment`.
         Insert: {
@@ -528,8 +530,12 @@ export interface Database {
         // A status_id change is only accepted when
         // order_status_transitions has a matching row for this tenant —
         // an update to any other status_id is rejected by the database.
+        // paid_at/payment_method (0033/0035) são independentes do
+        // status_id - não passam pela validação de transição.
         Update: {
           status_id?: string;
+          paid_at?: string | null;
+          payment_method?: "cash" | "pix" | "debit" | "credit" | null;
           updated_at?: string;
         };
         Relationships: [
