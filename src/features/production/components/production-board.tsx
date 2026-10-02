@@ -50,6 +50,13 @@ function minutesSince(iso: string, now: number) {
   return Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000));
 }
 
+function formatElapsed(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return `${hours}h${rest.toString().padStart(2, "0")}`;
+}
+
 async function fetchBoard() {
   const db = createDbClient();
   const { data, error } = await db
@@ -320,7 +327,7 @@ function OrderCard({
             isLate ? "text-danger" : "text-muted"
           }`}
         >
-          {minutes} min
+          {formatElapsed(minutes)}
         </span>
       </div>
 
@@ -343,13 +350,20 @@ function OrderCard({
       )}
 
       {stage === "new" && (
-        <Button
-          size="lg"
-          className="w-full bg-[#f97316] text-white hover:bg-[#ea580c]"
-          onClick={hasStations ? onStart : onMarkReady}
-        >
-          {hasStations ? "Iniciar produção" : "Marcar como pronto"}
-        </Button>
+        <div className="flex flex-col gap-1">
+          <Button
+            size="lg"
+            className="w-full bg-[#f97316] text-white hover:bg-[#ea580c]"
+            onClick={hasStations ? onStart : onMarkReady}
+          >
+            {hasStations ? "Iniciar produção" : "Marcar como pronto"}
+          </Button>
+          {!hasStations && (
+            <p className="text-center text-xs text-muted">
+              Sem item de preparo — clique quando estiver separado pra avisar o cliente
+            </p>
+          )}
+        </div>
       )}
       {stage === "in_progress" && (
         <Button size="lg" className="w-full bg-[#2563eb] text-white hover:bg-[#1d4ed8]" onClick={onMarkReady}>
