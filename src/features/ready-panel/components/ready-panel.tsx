@@ -23,6 +23,49 @@ const NEWLY_READY_MS = 8000;
  * autoatendimento, não tem garçom pra levar); `qr_code`/`tablet_mesa`
  * são uma mesa de verdade, a equipe entrega lá.
  */
+/**
+ * `list_ready_orders` já limita a 10 pedidos (0028), mas mesmo assim 10
+ * cards do tamanho de 2 não cabem numa TV sem rolar — rolagem numa tela
+ * passiva de retirada esconde senha de quem chegou primeiro. Em vez de
+ * crescer pra baixo, o quadro fica mais denso: menos pedidos, cards
+ * gigantes; mais pedidos, mais colunas e letra um pouco menor — sempre
+ * uma tela só, sem scroll.
+ */
+type Density = "spacious" | "comfortable" | "dense";
+
+function densityOf(count: number): Density {
+  if (count <= 3) return "spacious";
+  if (count <= 6) return "comfortable";
+  return "dense";
+}
+
+const GRID_DENSITY: Record<
+  Density,
+  { grid: string; pad: string; number: string; name: string; badge: string }
+> = {
+  spacious: {
+    grid: "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3",
+    pad: "px-6 py-8",
+    number: "text-7xl sm:text-8xl",
+    name: "text-2xl sm:text-3xl",
+    badge: "text-sm sm:text-base",
+  },
+  comfortable: {
+    grid: "grid-cols-2 sm:grid-cols-3",
+    pad: "px-5 py-6",
+    number: "text-6xl sm:text-7xl",
+    name: "text-xl sm:text-2xl",
+    badge: "text-xs sm:text-sm",
+  },
+  dense: {
+    grid: "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5",
+    pad: "px-3 py-4",
+    number: "text-4xl sm:text-5xl",
+    name: "text-base sm:text-lg",
+    badge: "text-xs",
+  },
+};
+
 const PICKUP_INSTRUCTION: Record<string, string> = {
   totem: "RETIRE NO BALCÃO",
   staff: "RETIRE NO BALCÃO",
@@ -132,6 +175,8 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
     }
   }
 
+  const size = GRID_DENSITY[densityOf(orders.length)];
+
   return (
     <main className="flex min-h-screen flex-col gap-10 bg-[#0b0d10] px-6 py-10 text-white sm:px-12">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -165,7 +210,7 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
           </p>
         </div>
       ) : (
-        <div className="grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        <div className={`grid flex-1 content-start gap-4 ${size.grid}`}>
           {orders.map((order) => {
             const isNew = newlyReadyIds.has(order.order_id);
             const instruction = PICKUP_INSTRUCTION[order.channel] ?? "RETIRE NO BALCÃO";
@@ -175,27 +220,27 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
                 key={order.order_id}
                 type="button"
                 onClick={() => handleDismiss(order.order_id)}
-                className={`flex flex-col items-center gap-3 rounded-3xl border-2 px-6 py-8 text-center transition-colors active:opacity-70 ${
+                className={`flex flex-col items-center gap-2 rounded-3xl border-2 text-center transition-colors active:opacity-70 ${size.pad} ${
                   isNew
                     ? "animate-pulse border-[#2ecf8b] bg-[#2ecf8b] text-[#07140d]"
                     : "border-white/10 bg-white/[0.06]"
                 }`}
               >
-                <span className="font-mono text-7xl font-black leading-none tabular-nums sm:text-8xl">
+                <span className={`font-mono font-black leading-none tabular-nums ${size.number}`}>
                   {order.pickup_number != null ? `#${order.pickup_number.toString().padStart(2, "0")}` : "—"}
                 </span>
-                <span className="text-2xl font-bold uppercase tracking-wide sm:text-3xl">
+                <span className={`font-bold uppercase tracking-wide ${size.name}`}>
                   {order.customer_name ?? order.location_label}
                 </span>
                 <span
-                  className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-extrabold uppercase tracking-wide sm:text-base ${
+                  className={`flex items-center gap-2 rounded-full px-4 py-1.5 font-extrabold uppercase tracking-wide ${size.badge} ${
                     isNew ? "bg-[#07140d]/15 text-[#07140d]" : "bg-[#16a34a]/20 text-[#4ade80]"
                   }`}
                 >
                   ✓ Pronto
                 </span>
                 <span
-                  className={`text-sm font-semibold uppercase tracking-wide sm:text-base ${
+                  className={`font-semibold uppercase tracking-wide ${size.badge} ${
                     isNew ? "text-[#07140d]/80" : "text-white/60"
                   }`}
                 >
