@@ -20,6 +20,14 @@ function formatBRL(value: number) {
 
 type CustomerChannel = "qr_code" | "totem" | "tablet_mesa";
 
+type TotemPaymentMethod = "pix" | "debit" | "credit";
+
+const TOTEM_PAYMENT_METHODS: { key: TotemPaymentMethod; label: string }[] = [
+  { key: "pix", label: "PIX" },
+  { key: "debit", label: "Débito" },
+  { key: "credit", label: "Crédito" },
+];
+
 // `productId` só existe nas linhas de QR Code/Tablet na Mesa ainda não
 // enviadas - carrinho local, nada no banco até "Enviar pedido". Pro
 // Totem (e depois de enviado, pros demais canais) `id` é o id real do
@@ -115,6 +123,7 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
   const [startedOrdering, setStartedOrdering] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
   const [customerName, setCustomerName] = useState("");
+  const [totemPaymentMethod, setTotemPaymentMethod] = useState<TotemPaymentMethod | null>(null);
   const [paying, setPaying] = useState(false);
   const [sendingOrder, setSendingOrder] = useState(false);
   const [orderSent, setOrderSent] = useState(false);
@@ -456,7 +465,7 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
   }
 
   async function handleConfirmPayment() {
-    if (!tab?.access_token || !orderId) return;
+    if (!tab?.access_token || !orderId || !totemPaymentMethod) return;
     setError(null);
     setPaying(true);
 
@@ -464,6 +473,7 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
       p_token: tab.access_token,
       p_order_id: orderId,
       p_customer_name: customerName,
+      p_payment_method: totemPaymentMethod,
     });
 
     setPaying(false);
@@ -688,13 +698,34 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
           />
         </div>
         <p className="text-lg font-semibold">Total: {formatBRL(checkoutTotal)}</p>
+
+        <div className="flex w-full max-w-sm flex-col gap-1.5 text-left">
+          <p className="text-sm font-medium">Forma de pagamento</p>
+          <div className="grid grid-cols-3 gap-2">
+            {TOTEM_PAYMENT_METHODS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setTotemPaymentMethod(option.key)}
+                className={`rounded-lg border px-3 py-3 text-sm font-medium transition-colors ${
+                  totemPaymentMethod === option.key
+                    ? "border-brand bg-brand/10"
+                    : "border-brand/30 bg-white"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {error && <p className="text-sm text-danger">{error}</p>}
         <Button
           size="lg"
-          disabled={!customerName.trim() || paying || checkoutLines.length === 0}
+          disabled={!customerName.trim() || !totemPaymentMethod || paying || checkoutLines.length === 0}
           onClick={handleConfirmPayment}
         >
-          {paying ? "Confirmando..." : "Pagamento aprovado (simulado)"}
+          {paying ? "Confirmando..." : "Pagar (simulado)"}
         </Button>
         <button
           className="text-sm text-[#666666] underline underline-offset-4"
