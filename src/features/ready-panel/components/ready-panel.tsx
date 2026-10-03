@@ -18,10 +18,9 @@ const POLL_MS = 5000;
 const NEWLY_READY_MS = 8000;
 
 /**
- * Como o pedido chegou define onde o cliente vai buscá-lo — nunca mais
- * "NA MESA" genérico. `staff`/`totem` são retirada no balcão (totem é
- * autoatendimento, não tem garçom pra levar); `qr_code`/`tablet_mesa`
- * são uma mesa de verdade, a equipe entrega lá.
+ * Decisão do usuário: todo canal retira no balcão - ninguém leva pedido
+ * até a mesa, nem QR Code/Tablet na Mesa (que antes tinham instrução
+ * diferente, "entregaremos na mesa").
  */
 /**
  * `list_ready_orders` já limita a 10 pedidos (0028), mas mesmo assim 10
@@ -64,13 +63,6 @@ const GRID_DENSITY: Record<
     name: "text-base sm:text-lg",
     badge: "text-xs",
   },
-};
-
-const PICKUP_INSTRUCTION: Record<string, string> = {
-  totem: "RETIRE NO BALCÃO",
-  staff: "RETIRE NO BALCÃO",
-  qr_code: "ENTREGAREMOS NA MESA",
-  tablet_mesa: "ENTREGAREMOS NA MESA",
 };
 
 /**
@@ -201,7 +193,6 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
         <div className={`grid flex-1 content-start gap-4 ${size.grid}`}>
           {orders.map((order) => {
             const isNew = newlyReadyIds.has(order.order_id);
-            const instruction = PICKUP_INSTRUCTION[order.channel] ?? "RETIRE NO BALCÃO";
 
             return (
               <div
@@ -230,7 +221,7 @@ export function ReadyPanel({ tenantId }: { tenantId: string }) {
                     isNew ? "text-[#07140d]/80" : "text-white/60"
                   }`}
                 >
-                  {instruction}
+                  RETIRE NO BALCÃO
                 </span>
               </div>
             );
