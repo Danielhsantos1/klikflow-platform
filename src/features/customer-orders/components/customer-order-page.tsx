@@ -20,7 +20,11 @@ function formatBRL(value: number) {
 
 type CustomerChannel = "qr_code" | "totem" | "tablet_mesa";
 
-type CartItem = { id: string; name: string; unitPrice: number; quantity: number };
+// `productId` só existe nas linhas de QR Code/Tablet na Mesa ainda não
+// enviadas - carrinho local, nada no banco até "Enviar pedido". Pro
+// Totem (e depois de enviado, pros demais canais) `id` é o id real do
+// `order_items` no banco.
+type CartItem = { id: string; productId?: string; name: string; unitPrice: number; quantity: number };
 
 function tokenStorageKey(locationId: string) {
   return `klikflow.customer_tab_token.${locationId}`;
@@ -81,9 +85,11 @@ function playReadyChime() {
  * aparelho compartilhado e o pedido já segue por senha.
  *
  * QR Code e Tablet na Mesa NÃO pagam aqui (reestruturação do fluxo de
- * pagamento): cada item já vai pra produção assim que entra no
- * carrinho (`default_order_status()`, 0035, já cria o pedido direto em
- * "Novo" pra esses canais) e o cliente pode pedir quantas vezes
+ * pagamento) e o carrinho fica só local até o cliente revisar e tocar
+ * "Enviar pedido" (`handleSendOrder`) — só aí os itens viram
+ * `create_customer_order`/`add_customer_order_item` de verdade, e o
+ * pedido nasce direto em "Novo" pra esses canais (`default_order_status()`,
+ * 0035) e já vai pra produção. O cliente pode pedir quantas vezes
  * quiser — o pagamento de tudo junto só acontece no Caixa, quando ele
  * for embora.
  */
@@ -110,6 +116,8 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
   const [checkingOut, setCheckingOut] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [paying, setPaying] = useState(false);
+  const [sendingOrder, setSendingOrder] = useState(false);
+  const [orderSent, setOrderSent] = useState(false);
   const [finished, setFinished] = useState(false);
   const [pickupNumber, setPickupNumber] = useState<number | null>(null);
   const [orderStatusKey, setOrderStatusKey] = useState<string | null>(null);
@@ -301,47 +309,64 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
     if (!tab?.access_token) return;
     setError(null);
 
-    let currentOrderId = orderId;
+    // Totem: continua indo pro banco na hora (não tem "revisar depois",
+    // a tela de pagamento já cumpre esse papel).
+    if (isTotem) {
+      let currentOrderId = orderId;
 
-    if (!currentOrderId) {
-      const { data, error: orderError } = await anonRpc<Order>("create_customer_order", {
+      if (!currentOrderId) {
+        const { data, error: orderError } = await anonRpc<Order>("create_customer_order", {
+          p_token: tab.access_token,
+        });
+
+        if (orderError || !data) {
+          setError(orderError ?? "Não foi possível criar o pedido.");
+          return;
+        }
+
+        currentOrderId = data.id;
+        setOrderId(currentOrderId);
+      }
+
+      const { data: item, error: itemError } = await anonRpc<OrderItem>("add_customer_order_item", {
         p_token: tab.access_token,
+        p_order_id: currentOrderId,
+        p_product_id: product.id,
+        p_quantity: 1,
       });
 
-      if (orderError || !data) {
-        setError(orderError ?? "Não foi possível criar o pedido.");
+      if (itemError || !item) {
+        setError(itemError ?? "Não foi possível adicionar o item.");
         return;
       }
 
-      currentOrderId = data.id;
-      setOrderId(currentOrderId);
-    }
-
-    const { data: item, error: itemError } = await anonRpc<OrderItem>("add_customer_order_item", {
-      p_token: tab.access_token,
-      p_order_id: currentOrderId,
-      p_product_id: product.id,
-      p_quantity: 1,
-    });
-
-    if (itemError || !item) {
-      setError(itemError ?? "Não foi possível adicionar o item.");
+      setCart((current) => [
+        ...current,
+        {
+          id: item.id,
+          name: item.product_name,
+          unitPrice: Number(item.unit_price),
+          quantity: item.quantity,
+        },
+      ]);
       return;
     }
 
+    // QR Code / Tablet na Mesa: carrinho só local - nada vai pro banco
+    // até o cliente revisar e tocar "Enviar pedido" (handleSendOrder).
     setCart((current) => [
       ...current,
       {
-        id: item.id,
-        name: item.product_name,
-        unitPrice: Number(item.unit_price),
-        quantity: item.quantity,
+        id: `local-${crypto.randomUUID()}`,
+        productId: product.id,
+        name: product.name,
+        unitPrice: Number(product.price),
+        quantity: 1,
       },
     ]);
   }
 
   async function handleRemoveFromCart(lineKey: string) {
-    if (!tab?.access_token) return;
     setError(null);
 
     const [name, unitPriceText] = lineKey.split(":");
@@ -350,6 +375,18 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
       .find((item) => item.name === name && String(item.unitPrice) === unitPriceText);
 
     if (!lastMatch) return;
+
+    // Item ainda local (QR Code/Tablet, não enviado) - só tira do estado,
+    // sem chamada nenhuma ao banco.
+    if (!isTotem) {
+      setCart((current) => {
+        const index = current.map((item) => item.id).lastIndexOf(lastMatch.id);
+        return current.filter((_, i) => i !== index);
+      });
+      return;
+    }
+
+    if (!tab?.access_token) return;
 
     const { error: removeError } = await anonRpc<void>("remove_customer_order_item", {
       p_token: tab.access_token,
@@ -365,6 +402,57 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
       const index = current.map((item) => item.id).lastIndexOf(lastMatch.id);
       return current.filter((_, i) => i !== index);
     });
+  }
+
+  /**
+   * Único momento em que o pedido do QR Code/Tablet na Mesa de fato vai
+   * pro banco - antes disso é tudo carrinho local (handleAddToCart).
+   * Cria o pedido (se ainda não existe um pro cliente nesta comanda) e
+   * manda uma linha por produto do carrinho, já com a quantidade certa.
+   */
+  async function handleSendOrder() {
+    if (!tab?.access_token || cart.length === 0) return;
+    setError(null);
+    setSendingOrder(true);
+
+    let currentOrderId = orderId;
+
+    if (!currentOrderId) {
+      const { data, error: orderError } = await anonRpc<Order>("create_customer_order", {
+        p_token: tab.access_token,
+      });
+
+      if (orderError || !data) {
+        setSendingOrder(false);
+        setError(orderError ?? "Não foi possível criar o pedido.");
+        return;
+      }
+
+      currentOrderId = data.id;
+      setOrderId(currentOrderId);
+    }
+
+    for (const line of cart) {
+      if (!line.productId) continue;
+
+      const { error: itemError } = await anonRpc<OrderItem>("add_customer_order_item", {
+        p_token: tab.access_token,
+        p_order_id: currentOrderId,
+        p_product_id: line.productId,
+        p_quantity: line.quantity,
+      });
+
+      if (itemError) {
+        setSendingOrder(false);
+        setError(itemError);
+        return;
+      }
+    }
+
+    setSendingOrder(false);
+    setCart([]);
+    setCheckingOut(false);
+    setOrderSent(true);
   }
 
   async function handleConfirmPayment() {
@@ -471,6 +559,24 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
     );
   }
 
+  if (orderSent) {
+    return (
+      <main
+        translate="no"
+        className="notranslate flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
+        style={brandStyleVars(brandColor)}
+      >
+        <p className="text-2xl">Pedido enviado! ✅</p>
+        <p className="text-lg text-muted">Já está a caminho da cozinha.</p>
+        <p className="text-sm text-muted">
+          Peça mais sempre que quiser. Quando for embora, procure o Caixa pra pagar (ou chame um
+          atendente na mesa).
+        </p>
+        <Button onClick={() => setOrderSent(false)}>Pedir mais</Button>
+      </main>
+    );
+  }
+
   if (checkingOut) {
     const checkoutLines: CartLine[] = Object.values(
       cart.reduce<Record<string, CartLine>>((lines, item) => {
@@ -484,11 +590,11 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
     );
     const checkoutTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 
-    // QR Code e Tablet na Mesa não pagam aqui — os itens já foram pra
-    // cozinha assim que entraram no carrinho (cada toque já chama
-    // add_customer_order_item). Essa tela é só uma conferência da
-    // comanda até agora; o cliente pode voltar e pedir mais à vontade.
-    // O pagamento de verdade acontece só no Caixa, quando for embora.
+    // QR Code e Tablet na Mesa: isso aqui é a revisão ANTES de enviar -
+    // nada foi pro banco ainda (carrinho é só local, handleAddToCart).
+    // O cliente remove/ajusta à vontade e só quando toca "Enviar
+    // pedido" (handleSendOrder) os itens realmente vão pra cozinha. O
+    // pagamento de verdade acontece só no Caixa, quando for embora.
     if (!isTotem) {
       return (
         <main
@@ -496,8 +602,7 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
           className="notranslate flex flex-1 flex-col items-center gap-6 bg-[#F9F6F0] px-6 py-10 text-center text-[#1A1A1A]"
           style={brandStyleVars(brandColor)}
         >
-          <p className="text-2xl">Pedido enviado! ✅</p>
-          <p className="text-base text-[#666666]">Já está a caminho da cozinha.</p>
+          <p className="text-2xl">Revise seu pedido</p>
 
           <div className="flex w-full max-w-sm flex-col gap-2 text-left">
             {checkoutLines.map((line) => (
@@ -522,15 +627,21 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
             )}
           </div>
 
-          <p className="text-lg font-semibold">Total até agora: {formatBRL(checkoutTotal)}</p>
+          <p className="text-lg font-semibold">Total: {formatBRL(checkoutTotal)}</p>
           {error && <p className="text-sm text-danger">{error}</p>}
-          <p className="text-sm text-[#666666]">
-            Peça mais sempre que quiser. Quando for embora, procure o Caixa pra pagar (ou chame um
-            atendente na mesa).
-          </p>
-          <Button size="lg" onClick={() => setCheckingOut(false)}>
-            Continuar pedindo
+          <Button
+            size="lg"
+            disabled={sendingOrder || checkoutLines.length === 0}
+            onClick={handleSendOrder}
+          >
+            {sendingOrder ? "Enviando..." : "Enviar pedido"}
           </Button>
+          <button
+            className="text-sm text-[#666666] underline underline-offset-4"
+            onClick={() => setCheckingOut(false)}
+          >
+            Voltar ao cardápio
+          </button>
         </main>
       );
     }
@@ -789,7 +900,7 @@ export function CustomerOrderPage(props: CustomerOrderPageProps) {
             className="bg-brand-foreground text-brand hover:opacity-90"
             onClick={() => setCheckingOut(true)}
           >
-            {isTotem ? "Ver pedido" : "Enviar pedido"}
+            Ver pedido
           </Button>
         </div>
       )}
