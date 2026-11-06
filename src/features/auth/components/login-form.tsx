@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { authClient } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,12 @@ export function LoginForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
+        <Link
+          href="/esqueci-senha"
+          className="self-end text-xs text-muted underline underline-offset-4 hover:text-foreground"
+        >
+          Esqueci minha senha
+        </Link>
       </div>
       {error && <Alert variant="danger">{error}</Alert>}
       <Button type="submit" disabled={loading}>
