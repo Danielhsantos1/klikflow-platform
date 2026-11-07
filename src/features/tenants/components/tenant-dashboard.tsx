@@ -7,6 +7,7 @@ import { createDbClient } from "@/lib/db/client";
 import { CreateTenantForm } from "@/features/tenants/components/create-tenant-form";
 import { CashierBoard } from "@/features/cashier/components/cashier-board";
 import { CatalogManager } from "@/features/catalog/components/catalog-manager";
+import { ChecklistsManager } from "@/features/checklists/components/checklists-manager";
 import { CustomerOrderPage } from "@/features/customer-orders/components/customer-order-page";
 import { OperationsBoard } from "@/features/tabs/components/operations-board";
 import { TabHistory } from "@/features/tabs/components/tab-history";
@@ -27,6 +28,7 @@ type View =
   | "cashier"
   | "production"
   | "history"
+  | "checklists"
   | "catalog"
   | "menu-preview"
   | "team"
@@ -145,6 +147,7 @@ export function TenantDashboard() {
         { key: "cashier", label: "Caixa", available: true },
         { key: "production", label: "Produção", available: true },
         { key: "history", label: "Histórico", available: true },
+        { key: "checklists", label: "Checklists", available: true },
       ],
     },
     {
@@ -199,6 +202,7 @@ export function TenantDashboard() {
         {view === "cashier" && <CashierBoard />}
         {view === "production" && <ProductionBoard />}
         {view === "history" && <TabHistory tenantId={tenant.id} />}
+        {view === "checklists" && <ChecklistsManager tenantId={tenant.id} userId={userId ?? ""} />}
         {view === "catalog" && (
           <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
         )}

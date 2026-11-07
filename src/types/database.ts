@@ -486,6 +486,90 @@ export interface Database {
           },
         ];
       };
+      checklists: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          status: CatalogStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          status?: CatalogStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          status?: CatalogStatus;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "checklists_tenant_id_fkey";
+            columns: ["tenant_id"];
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      checklist_items: {
+        Row: {
+          id: string;
+          checklist_id: string;
+          label: string;
+          sequence: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          checklist_id: string;
+          label: string;
+          sequence?: number;
+          created_at?: string;
+        };
+        Update: {
+          label?: string;
+          sequence?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "checklist_items_checklist_id_fkey";
+            columns: ["checklist_id"];
+            referencedRelation: "checklists";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      checklist_item_completions: {
+        Row: {
+          id: string;
+          checklist_item_id: string;
+          completed_on: string;
+          completed_by: string;
+          completed_at: string;
+        };
+        Insert: {
+          id?: string;
+          checklist_item_id: string;
+          completed_on?: string;
+          completed_by: string;
+          completed_at?: string;
+        };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "checklist_item_completions_checklist_item_id_fkey";
+            columns: ["checklist_item_id"];
+            referencedRelation: "checklist_items";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       consumption_locations: {
         Row: {
           id: string;

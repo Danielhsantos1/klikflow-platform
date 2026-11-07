@@ -19,5 +19,10 @@ export type ConsumptionLocation =
 export type Ingredient = Database["public"]["Tables"]["ingredients"]["Row"];
 export type ProductIngredient =
   Database["public"]["Tables"]["product_ingredients"]["Row"];
+export type Checklist = Database["public"]["Tables"]["checklists"]["Row"];
+export type ChecklistItem =
+  Database["public"]["Tables"]["checklist_items"]["Row"];
+export type ChecklistItemCompletion =
+  Database["public"]["Tables"]["checklist_item_completions"]["Row"];
 
 export type { CatalogStatus };
