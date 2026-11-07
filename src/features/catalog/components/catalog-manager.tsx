@@ -83,6 +83,7 @@ export function CatalogManager({
   const [ingredientName, setIngredientName] = useState("");
   const [ingredientUnit, setIngredientUnit] = useState<Ingredient["unit"]>("kg");
   const [ingredientCost, setIngredientCost] = useState("");
+  const [ingredientMinStock, setIngredientMinStock] = useState("");
   const [recipeOpenProductId, setRecipeOpenProductId] = useState<string | null>(null);
 
   async function reload() {
@@ -340,12 +341,19 @@ export function CatalogManager({
       return;
     }
 
+    const minStock = ingredientMinStock ? Number(ingredientMinStock.replace(",", ".")) : 0;
+    if (!Number.isFinite(minStock) || minStock < 0) {
+      setError("Estoque mínimo inválido.");
+      return;
+    }
+
     const db = createDbClient();
     const { error: insertError } = await db.from("ingredients").insert({
       tenant_id: tenantId,
       name: ingredientName,
       unit: ingredientUnit,
       cost_per_unit: cost,
+      min_stock: minStock,
     });
 
     if (insertError) {
@@ -355,6 +363,27 @@ export function CatalogManager({
 
     setIngredientName("");
     setIngredientCost("");
+    setIngredientMinStock("");
+    await reload();
+  }
+
+  async function handleAdjustStock(ingredient: Ingredient, delta: number) {
+    setError(null);
+
+    const nextStock = Number(ingredient.current_stock) + delta;
+    if (nextStock < 0) return;
+
+    const db = createDbClient();
+    const { error: updateError } = await db
+      .from("ingredients")
+      .update({ current_stock: nextStock })
+      .eq("id", ingredient.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
     await reload();
   }
 
@@ -553,30 +582,61 @@ export function CatalogManager({
           <h2 className="text-lg font-medium">Ingredientes</h2>
           <p className="text-sm text-muted">
             Cadastre com o custo por unidade pra poder montar a ficha técnica dos produtos
-            (abaixo) e ver o CMV de cada um.
+            (abaixo) e ver o CMV de cada um. O estoque mínimo dispara um alerta (em vermelho)
+            quando a quantidade atual fica abaixo dele — ajuste com os botões +/− ao repor ou
+            contar.
           </p>
         </div>
         <ul className="flex flex-col gap-1.5">
-          {ingredients.map((ingredient) => (
-            <li
-              key={ingredient.id}
-              className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2 text-sm"
-            >
-              <span>{ingredient.name}</span>
-              <span className="flex items-center gap-3 text-muted">
-                <span>
-                  {formatBRL(Number(ingredient.cost_per_unit))} / {unitLabel(ingredient.unit)}
+          {ingredients.map((ingredient) => {
+            const isLow = Number(ingredient.current_stock) < Number(ingredient.min_stock);
+
+            return (
+              <li
+                key={ingredient.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2 text-sm"
+              >
+                <span className="flex items-center gap-2">
+                  {ingredient.name}
+                  {isLow && (
+                    <Badge variant="danger" className="text-[10px]">
+                      Repor
+                    </Badge>
+                  )}
                 </span>
-                <button
-                  type="button"
-                  className="text-xs text-red-600 underline underline-offset-2"
-                  onClick={() => handleDeleteIngredient(ingredient)}
-                >
-                  Excluir
-                </button>
-              </span>
-            </li>
-          ))}
+                <span className="flex items-center gap-3 text-muted">
+                  <span className="text-xs">
+                    {formatBRL(Number(ingredient.cost_per_unit))} / {unitLabel(ingredient.unit)}
+                  </span>
+                  <span className={`flex items-center gap-1 text-xs ${isLow ? "text-red-600" : ""}`}>
+                    <button
+                      type="button"
+                      className="h-5 w-5 rounded border border-neutral-300 leading-none"
+                      onClick={() => handleAdjustStock(ingredient, -1)}
+                    >
+                      −
+                    </button>
+                    {Number(ingredient.current_stock)} {unitLabel(ingredient.unit)}
+                    <button
+                      type="button"
+                      className="h-5 w-5 rounded border border-neutral-300 leading-none"
+                      onClick={() => handleAdjustStock(ingredient, 1)}
+                    >
+                      +
+                    </button>
+                    <span className="text-neutral-400">(mín. {Number(ingredient.min_stock)})</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="text-xs text-red-600 underline underline-offset-2"
+                    onClick={() => handleDeleteIngredient(ingredient)}
+                  >
+                    Excluir
+                  </button>
+                </span>
+              </li>
+            );
+          })}
           {ingredients.length === 0 && (
             <li className="text-sm text-neutral-400">Nenhum ingrediente ainda.</li>
           )}
@@ -606,6 +666,12 @@ export function CatalogManager({
             onChange={(event) => setIngredientCost(event.target.value)}
             required
             className="sm:w-48"
+          />
+          <Input
+            placeholder="Estoque mínimo (opcional)"
+            value={ingredientMinStock}
+            onChange={(event) => setIngredientMinStock(event.target.value)}
+            className="sm:w-40"
           />
           <Button type="submit">Adicionar</Button>
         </form>

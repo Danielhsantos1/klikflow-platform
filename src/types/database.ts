@@ -421,6 +421,8 @@ export interface Database {
           name: string;
           unit: "kg" | "g" | "l" | "ml" | "un";
           cost_per_unit: string;
+          current_stock: string;
+          min_stock: string;
           status: CatalogStatus;
           created_at: string;
           updated_at: string;
@@ -431,6 +433,8 @@ export interface Database {
           name: string;
           unit: "kg" | "g" | "l" | "ml" | "un";
           cost_per_unit: number | string;
+          current_stock?: number | string;
+          min_stock?: number | string;
           status?: CatalogStatus;
           created_at?: string;
           updated_at?: string;
@@ -439,6 +443,8 @@ export interface Database {
           name?: string;
           unit?: "kg" | "g" | "l" | "ml" | "un";
           cost_per_unit?: number | string;
+          current_stock?: number | string;
+          min_stock?: number | string;
           status?: CatalogStatus;
           updated_at?: string;
         };
