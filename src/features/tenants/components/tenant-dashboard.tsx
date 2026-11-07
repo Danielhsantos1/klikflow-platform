@@ -8,6 +8,7 @@ import { CreateTenantForm } from "@/features/tenants/components/create-tenant-fo
 import { CashierBoard } from "@/features/cashier/components/cashier-board";
 import { CatalogManager } from "@/features/catalog/components/catalog-manager";
 import { ChecklistsManager } from "@/features/checklists/components/checklists-manager";
+import { CashFlowReport } from "@/features/reports/components/cash-flow-report";
 import { CustomerOrderPage } from "@/features/customer-orders/components/customer-order-page";
 import { OperationsBoard } from "@/features/tabs/components/operations-board";
 import { TabHistory } from "@/features/tabs/components/tab-history";
@@ -29,6 +30,7 @@ type View =
   | "production"
   | "history"
   | "checklists"
+  | "reports"
   | "catalog"
   | "menu-preview"
   | "team"
@@ -148,6 +150,7 @@ export function TenantDashboard() {
         { key: "production", label: "Produção", available: true },
         { key: "history", label: "Histórico", available: true },
         { key: "checklists", label: "Checklists", available: true },
+        { key: "reports", label: "Fluxo de caixa", available: true },
       ],
     },
     {
@@ -169,7 +172,6 @@ export function TenantDashboard() {
       items: [
         { key: "clients", label: "Clientes", available: false },
         { key: "financial", label: "Financeiro", available: false },
-        { key: "reports", label: "Relatórios", available: false },
       ],
     },
   ];
@@ -203,6 +205,7 @@ export function TenantDashboard() {
         {view === "production" && <ProductionBoard />}
         {view === "history" && <TabHistory tenantId={tenant.id} />}
         {view === "checklists" && <ChecklistsManager tenantId={tenant.id} userId={userId ?? ""} />}
+        {view === "reports" && <CashFlowReport />}
         {view === "catalog" && (
           <CatalogManager tenantId={tenant.id} tenantName={tenant.name} />
         )}
