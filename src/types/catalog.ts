@@ -16,5 +16,8 @@ export type ProductStation =
   Database["public"]["Tables"]["product_stations"]["Row"];
 export type ConsumptionLocation =
   Database["public"]["Tables"]["consumption_locations"]["Row"];
+export type Ingredient = Database["public"]["Tables"]["ingredients"]["Row"];
+export type ProductIngredient =
+  Database["public"]["Tables"]["product_ingredients"]["Row"];
 
 export type { CatalogStatus };

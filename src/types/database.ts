@@ -414,6 +414,72 @@ export interface Database {
           },
         ];
       };
+      ingredients: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          unit: "kg" | "g" | "l" | "ml" | "un";
+          cost_per_unit: string;
+          status: CatalogStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          unit: "kg" | "g" | "l" | "ml" | "un";
+          cost_per_unit: number | string;
+          status?: CatalogStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          unit?: "kg" | "g" | "l" | "ml" | "un";
+          cost_per_unit?: number | string;
+          status?: CatalogStatus;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ingredients_tenant_id_fkey";
+            columns: ["tenant_id"];
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      product_ingredients: {
+        Row: {
+          product_id: string;
+          ingredient_id: string;
+          quantity: string;
+        };
+        Insert: {
+          product_id: string;
+          ingredient_id: string;
+          quantity: number | string;
+        };
+        Update: {
+          quantity?: number | string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "product_ingredients_product_id_fkey";
+            columns: ["product_id"];
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "product_ingredients_ingredient_id_fkey";
+            columns: ["ingredient_id"];
+            referencedRelation: "ingredients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       consumption_locations: {
         Row: {
           id: string;

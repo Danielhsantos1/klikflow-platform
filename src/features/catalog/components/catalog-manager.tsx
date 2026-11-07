@@ -7,26 +7,52 @@ import { uploadImage } from "@/lib/uploads/upload-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Category, Product, ProductionStation } from "@/types/catalog";
+import type { Category, Ingredient, Product, ProductionStation } from "@/types/catalog";
+
+type ProductIngredientWithDetails = {
+  ingredient_id: string;
+  quantity: string;
+  ingredients: Ingredient | null;
+};
 
 type ProductWithRelations = Product & {
   categories: { name: string } | null;
   product_stations: { station_id: string; production_stations: { name: string } | null }[];
+  product_ingredients: ProductIngredientWithDetails[];
 };
+
+function unitLabel(unit: Ingredient["unit"]) {
+  return { kg: "kg", g: "g", l: "L", ml: "ml", un: "un" }[unit];
+}
+
+function formatBRL(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function recipeCost(productIngredients: ProductIngredientWithDetails[]) {
+  return productIngredients.reduce((sum, pi) => {
+    if (!pi.ingredients) return sum;
+    return sum + Number(pi.quantity) * Number(pi.ingredients.cost_per_unit);
+  }, 0);
+}
 
 async function fetchCatalog(tenantId: string) {
   const db = createDbClient();
-  const [categoriesRes, productsRes, stationsRes] = await Promise.all([
+  const [categoriesRes, productsRes, stationsRes, ingredientsRes] = await Promise.all([
     db.from("categories").select("*").eq("tenant_id", tenantId).order("name"),
     db
       .from("products")
-      .select("*, categories(name), product_stations(station_id, production_stations(name))")
+      .select(
+        "*, categories(name), product_stations(station_id, production_stations(name))," +
+          " product_ingredients(ingredient_id, quantity, ingredients(*))",
+      )
       .eq("tenant_id", tenantId)
       .order("name"),
     db.from("production_stations").select("*").eq("tenant_id", tenantId).order("name"),
+    db.from("ingredients").select("*").eq("tenant_id", tenantId).order("name"),
   ]);
 
-  return { categoriesRes, productsRes, stationsRes };
+  return { categoriesRes, productsRes, stationsRes, ingredientsRes };
 }
 
 export function CatalogManager({
@@ -39,6 +65,7 @@ export function CatalogManager({
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<ProductWithRelations[]>([]);
   const [stations, setStations] = useState<ProductionStation[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,9 +80,13 @@ export function CatalogManager({
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingProductName, setEditingProductName] = useState("");
   const [editingProductDescription, setEditingProductDescription] = useState("");
+  const [ingredientName, setIngredientName] = useState("");
+  const [ingredientUnit, setIngredientUnit] = useState<Ingredient["unit"]>("kg");
+  const [ingredientCost, setIngredientCost] = useState("");
+  const [recipeOpenProductId, setRecipeOpenProductId] = useState<string | null>(null);
 
   async function reload() {
-    const { categoriesRes, productsRes, stationsRes } = await fetchCatalog(tenantId);
+    const { categoriesRes, productsRes, stationsRes, ingredientsRes } = await fetchCatalog(tenantId);
 
     if (categoriesRes.error) setError(categoriesRes.error.message);
     else setCategories(categoriesRes.data ?? []);
@@ -65,12 +96,15 @@ export function CatalogManager({
 
     if (stationsRes.error) setError(stationsRes.error.message);
     else setStations(stationsRes.data ?? []);
+
+    if (ingredientsRes.error) setError(ingredientsRes.error.message);
+    else setIngredients(ingredientsRes.data ?? []);
   }
 
   useEffect(() => {
     let cancelled = false;
 
-    fetchCatalog(tenantId).then(({ categoriesRes, productsRes, stationsRes }) => {
+    fetchCatalog(tenantId).then(({ categoriesRes, productsRes, stationsRes, ingredientsRes }) => {
       if (cancelled) return;
 
       if (categoriesRes.error) setError(categoriesRes.error.message);
@@ -81,6 +115,9 @@ export function CatalogManager({
 
       if (stationsRes.error) setError(stationsRes.error.message);
       else setStations(stationsRes.data ?? []);
+
+      if (ingredientsRes.error) setError(ingredientsRes.error.message);
+      else setIngredients(ingredientsRes.data ?? []);
 
       setLoading(false);
     });
@@ -293,6 +330,87 @@ export function CatalogManager({
     await reload();
   }
 
+  async function handleCreateIngredient(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+
+    const cost = Number(ingredientCost.replace(",", "."));
+    if (!Number.isFinite(cost) || cost < 0) {
+      setError("Custo inválido.");
+      return;
+    }
+
+    const db = createDbClient();
+    const { error: insertError } = await db.from("ingredients").insert({
+      tenant_id: tenantId,
+      name: ingredientName,
+      unit: ingredientUnit,
+      cost_per_unit: cost,
+    });
+
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+
+    setIngredientName("");
+    setIngredientCost("");
+    await reload();
+  }
+
+  async function handleDeleteIngredient(ingredient: Ingredient) {
+    setError(null);
+    if (!window.confirm(`Excluir o ingrediente "${ingredient.name}"?`)) return;
+
+    const db = createDbClient();
+    const { error: deleteError } = await db.from("ingredients").delete().eq("id", ingredient.id);
+
+    if (deleteError) {
+      setError(
+        deleteError.message.includes("foreign key")
+          ? `"${ingredient.name}" está numa ficha técnica — remova de lá antes de excluir.`
+          : deleteError.message,
+      );
+      return;
+    }
+
+    await reload();
+  }
+
+  async function handleAddProductIngredient(productId: string, ingredientId: string, quantity: number) {
+    setError(null);
+
+    const db = createDbClient();
+    const { error: insertError } = await db
+      .from("product_ingredients")
+      .insert({ product_id: productId, ingredient_id: ingredientId, quantity });
+
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+
+    await reload();
+  }
+
+  async function handleRemoveProductIngredient(productId: string, ingredientId: string) {
+    setError(null);
+
+    const db = createDbClient();
+    const { error: deleteError } = await db
+      .from("product_ingredients")
+      .delete()
+      .eq("product_id", productId)
+      .eq("ingredient_id", ingredientId);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    await reload();
+  }
+
   if (loading) {
     return <p className="text-neutral-500">Carregando cardápio...</p>;
   }
@@ -432,6 +550,69 @@ export function CatalogManager({
 
       <section className="flex flex-col gap-3">
         <div>
+          <h2 className="text-lg font-medium">Ingredientes</h2>
+          <p className="text-sm text-muted">
+            Cadastre com o custo por unidade pra poder montar a ficha técnica dos produtos
+            (abaixo) e ver o CMV de cada um.
+          </p>
+        </div>
+        <ul className="flex flex-col gap-1.5">
+          {ingredients.map((ingredient) => (
+            <li
+              key={ingredient.id}
+              className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 px-3 py-2 text-sm"
+            >
+              <span>{ingredient.name}</span>
+              <span className="flex items-center gap-3 text-muted">
+                <span>
+                  {formatBRL(Number(ingredient.cost_per_unit))} / {unitLabel(ingredient.unit)}
+                </span>
+                <button
+                  type="button"
+                  className="text-xs text-red-600 underline underline-offset-2"
+                  onClick={() => handleDeleteIngredient(ingredient)}
+                >
+                  Excluir
+                </button>
+              </span>
+            </li>
+          ))}
+          {ingredients.length === 0 && (
+            <li className="text-sm text-neutral-400">Nenhum ingrediente ainda.</li>
+          )}
+        </ul>
+        <form onSubmit={handleCreateIngredient} className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            placeholder="Nome (ex: Café em grão)"
+            value={ingredientName}
+            onChange={(event) => setIngredientName(event.target.value)}
+            required
+            className="sm:flex-1"
+          />
+          <select
+            className="h-10 rounded-md border border-neutral-200 bg-transparent px-3 text-sm"
+            value={ingredientUnit}
+            onChange={(event) => setIngredientUnit(event.target.value as Ingredient["unit"])}
+          >
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="l">L</option>
+            <option value="ml">ml</option>
+            <option value="un">un</option>
+          </select>
+          <Input
+            placeholder="Custo por unidade (ex: 40,00)"
+            value={ingredientCost}
+            onChange={(event) => setIngredientCost(event.target.value)}
+            required
+            className="sm:w-48"
+          />
+          <Button type="submit">Adicionar</Button>
+        </form>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
           <h2 className="text-lg font-medium">Produtos</h2>
           <p className="text-sm text-muted">
             O que aparece pra equipe lançar na comanda e pro cliente pedir pelo QR Code/Totem. Se
@@ -521,6 +702,19 @@ export function CatalogManager({
                       >
                         {isActive ? "Desativar" : "Ativar"}
                       </button>
+                      <button
+                        type="button"
+                        className="text-xs text-muted underline underline-offset-2"
+                        onClick={() =>
+                          setRecipeOpenProductId(
+                            recipeOpenProductId === product.id ? null : product.id,
+                          )
+                        }
+                      >
+                        {recipeOpenProductId === product.id
+                          ? "Fechar ficha técnica"
+                          : "Ficha técnica / CMV"}
+                      </button>
                     </div>
                   </>
                 )}
@@ -537,6 +731,18 @@ export function CatalogManager({
                   <span className="text-xs text-neutral-400">
                     Sem estação — já pronto, vai direto pra entrega.
                   </span>
+                )}
+                {recipeOpenProductId === product.id && (
+                  <RecipeEditor
+                    product={product}
+                    ingredients={ingredients}
+                    onAdd={(ingredientId, quantity) =>
+                      handleAddProductIngredient(product.id, ingredientId, quantity)
+                    }
+                    onRemove={(ingredientId) =>
+                      handleRemoveProductIngredient(product.id, ingredientId)
+                    }
+                  />
                 )}
               </li>
             );
@@ -618,6 +824,107 @@ function StationLinkForm({
       >
         Vincular
       </Button>
+    </div>
+  );
+}
+
+function RecipeEditor({
+  product,
+  ingredients,
+  onAdd,
+  onRemove,
+}: {
+  product: ProductWithRelations;
+  ingredients: Ingredient[];
+  onAdd: (ingredientId: string, quantity: number) => void;
+  onRemove: (ingredientId: string) => void;
+}) {
+  const [ingredientId, setIngredientId] = useState("");
+  const [quantity, setQuantity] = useState("");
+
+  const usedIds = new Set(product.product_ingredients.map((pi) => pi.ingredient_id));
+  const availableIngredients = ingredients.filter((ingredient) => !usedIds.has(ingredient.id));
+
+  const cost = recipeCost(product.product_ingredients);
+  const price = Number(product.price);
+  const cmvPercent = price > 0 ? (cost / price) * 100 : 0;
+  const margin = price - cost;
+
+  function handleAdd() {
+    const parsedQuantity = Number(quantity.replace(",", "."));
+    if (!ingredientId || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0) return;
+    onAdd(ingredientId, parsedQuantity);
+    setIngredientId("");
+    setQuantity("");
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md bg-[#f5f5f5] p-3">
+      <ul className="flex flex-col gap-1">
+        {product.product_ingredients.map((pi) => {
+          if (!pi.ingredients) return null;
+          const lineCost = Number(pi.quantity) * Number(pi.ingredients.cost_per_unit);
+
+          return (
+            <li key={pi.ingredient_id} className="flex items-center justify-between text-xs">
+              <span>
+                {pi.quantity} {unitLabel(pi.ingredients.unit)} de {pi.ingredients.name}
+              </span>
+              <span className="flex items-center gap-2 text-muted">
+                {formatBRL(lineCost)}
+                <button
+                  type="button"
+                  className="text-red-600 underline underline-offset-2"
+                  onClick={() => onRemove(pi.ingredient_id)}
+                >
+                  Remover
+                </button>
+              </span>
+            </li>
+          );
+        })}
+        {product.product_ingredients.length === 0 && (
+          <li className="text-xs text-neutral-400">Nenhum ingrediente na ficha ainda.</li>
+        )}
+      </ul>
+
+      {availableIngredients.length > 0 && (
+        <div className="flex gap-2">
+          <select
+            className="h-8 flex-1 rounded-md border border-neutral-200 bg-white px-2 text-xs"
+            value={ingredientId}
+            onChange={(event) => setIngredientId(event.target.value)}
+          >
+            <option value="">Adicionar ingrediente...</option>
+            {availableIngredients.map((ingredient) => (
+              <option key={ingredient.id} value={ingredient.id}>
+                {ingredient.name} ({unitLabel(ingredient.unit)})
+              </option>
+            ))}
+          </select>
+          <Input
+            placeholder="Qtd."
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            className="h-8 w-20 text-xs"
+          />
+          <Button type="button" size="sm" variant="outline" onClick={handleAdd}>
+            Adicionar
+          </Button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-neutral-200 pt-2 text-xs">
+        <span>
+          Custo: <strong>{formatBRL(cost)}</strong>
+        </span>
+        <span>
+          CMV: <strong>{cmvPercent.toFixed(1)}%</strong>
+        </span>
+        <span className={margin < 0 ? "text-red-600" : "text-success"}>
+          Margem: <strong>{formatBRL(margin)}</strong>
+        </span>
+      </div>
     </div>
   );
 }
